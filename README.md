@@ -5,8 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/popover-dark.png" alt="GrokBar usage panel (dark)" width="360" />
-  <img src="docs/screenshots/popover-light.png" alt="GrokBar usage panel (light)" width="360" />
+  <img src="docs/screenshots/panel-dark.png" alt="GrokBar usage panel on the Mac menu bar" width="720" />
 </p>
 
 <p align="center">
@@ -38,6 +37,10 @@ SuperGrok is on by default. Grok Bot and Cursor are off until you enable them in
 ---
 
 ## Popover
+
+<p align="center">
+  <img src="docs/screenshots/panel-light.png" alt="GrokBar usage panel (light)" width="720" />
+</p>
 
 Click the item for the usage panel: plan, reset countdown, and product split. Same numbers as the Omarchy widget.
 

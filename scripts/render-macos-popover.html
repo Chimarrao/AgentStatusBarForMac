@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>GrokBar macOS popover</title>
+<style>
+  :root {
+    --bar-h: 25px;
+    --pop-w: 340px;
+    --accent: #0a84ff;
+    --font: "SF Pro Text", "SF Pro Display", "Noto Sans", ui-sans-serif, system-ui, sans-serif;
+  }
+  html, body {
+    margin: 0;
+    background: transparent;
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+  }
+  body.dark { --accent: #0a84ff; }
+  body.light { --accent: #007aff; }
+
+  .scene {
+    width: 720px;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  body.dark .scene {
+    background:
+      linear-gradient(180deg, rgba(8,10,18,0.35), rgba(8,10,18,0.55)),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect fill='%23121620' width='80' height='80'/%3E%3C/svg%3E");
+    background-color: #121620;
+  }
+  body.light .scene {
+    background: #d8dee8;
+  }
+
+  .menubar {
+    height: var(--bar-h);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+    padding: 0 14px;
+    border-radius: 0;
+    font-size: 13px;
+    letter-spacing: -0.01em;
+  }
+  body.dark .menubar {
+    color: rgba(255,255,255,0.92);
+    background: rgba(22,22,24,0.78);
+    backdrop-filter: blur(24px);
+  }
+  body.light .menubar {
+    color: rgba(0,0,0,0.82);
+    background: rgba(246,246,246,0.82);
+    backdrop-filter: blur(24px);
+  }
+  .cluster {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .cluster .dim { opacity: 0.7; }
+  .ico { width: 14px; height: 14px; display: block; }
+  body.dark .ico { color: #fff; fill: currentColor; }
+  body.light .ico { color: #1d1d1f; fill: currentColor; }
+
+  .desk {
+    position: relative;
+    min-height: 540px;
+    display: flex;
+    justify-content: flex-end;
+    padding: 10px 28px 28px 0;
+  }
+
+  .popover {
+    width: var(--pop-w);
+    position: relative;
+    border-radius: 10px;
+    padding: 14px;
+    box-sizing: border-box;
+  }
+  body.dark .popover {
+    color: #f5f5f7;
+    background: rgba(42,42,44,0.92);
+    box-shadow:
+      0 0 0 0.5px rgba(255,255,255,0.12),
+      0 18px 50px rgba(0,0,0,0.55);
+    backdrop-filter: blur(40px) saturate(1.4);
+  }
+  body.light .popover {
+    color: #1d1d1f;
+    background: rgba(246,246,246,0.94);
+    box-shadow:
+      0 0 0 0.5px rgba(0,0,0,0.12),
+      0 18px 50px rgba(0,0,0,0.22);
+    backdrop-filter: blur(40px) saturate(1.4);
+  }
+  .arrow {
+    position: absolute;
+    top: -7px;
+    right: 86px;
+    width: 14px;
+    height: 14px;
+    transform: rotate(45deg);
+    border-radius: 2px;
+  }
+  body.dark .arrow { background: rgba(42,42,44,0.92); }
+  body.light .arrow { background: rgba(246,246,246,0.94); }
+
+  .hdr {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-bottom: 12px;
+    color: rgba(127,127,127,0.95);
+  }
+  .hdr button {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    width: 18px;
+    height: 18px;
+  }
+  .hdr svg { width: 14px; height: 14px; display: block; }
+
+  .stack { display: flex; flex-direction: column; gap: 14px; }
+  .hr {
+    height: 1px;
+    border: 0;
+    margin: 14px 0;
+  }
+  body.dark .hr { background: rgba(255,255,255,0.12); }
+  body.light .hr { background: rgba(0,0,0,0.1); }
+
+  .prov { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .prov .mark { width: 16px; height: 16px; }
+  .prov h2 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 590;
+    letter-spacing: -0.01em;
+  }
+
+  .row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .row .left { flex: 1; }
+  .row .right {
+    font-size: 11px;
+    text-align: right;
+  }
+  body.dark .right, body.dark .muted { color: rgba(255,255,255,0.55); }
+  body.light .right, body.light .muted { color: rgba(0,0,0,0.45); }
+
+  .meter {
+    height: 8px;
+    border-radius: 999px;
+    position: relative;
+    overflow: hidden;
+  }
+  body.dark .meter { background: rgba(255,255,255,0.12); }
+  body.light .meter { background: rgba(0,0,0,0.12); }
+  .fill {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--accent);
+    min-width: 4px;
+  }
+  .tick {
+    position: absolute;
+    top: 11%;
+    width: 1px;
+    height: 78%;
+    background: rgba(127,127,127,0.55);
+  }
+  .pace {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    height: 100%;
+    background: var(--accent);
+  }
+
+  .products { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+  .products div {
+    display: flex;
+    font-size: 12px;
+  }
+  .products span:last-child {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+  }
+  body.dark .products span:last-child { color: rgba(255,255,255,0.55); }
+  body.light .products span:last-child { color: rgba(0,0,0,0.45); }
+
+  .quit {
+    margin-top: 0;
+    font-size: 12px;
+  }
+  body.dark .quit { color: rgba(255,255,255,0.55); }
+  body.light .quit { color: rgba(0,0,0,0.45); }
+
+  body.crop .scene {
+    padding: 28px;
+    width: max-content;
+    background: transparent;
+  }
+  body.dark.crop { background: #1a1b1e; }
+  body.light.crop { background: #e8eaee; }
+  body.crop .menubar, body.crop .arrow { display: none; }
+  body.crop .desk { min-height: 0; padding: 0; justify-content: center; }
+</style>
+</head>
+<body class="dark">
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="grok" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M9.23842 15.4055L17.3051 9.26292C17.7006 8.9618 18.2658 9.07925 18.4543 9.54702C19.446 12.0138 19.0029 14.9784 17.0297 17.0138C15.0566 19.0492 12.3111 19.4955 9.80163 18.4789L7.06027 19.7882C10.9922 22.5604 15.7667 21.8748 18.7504 18.795C21.117 16.3538 21.8499 13.0262 21.1646 10.0254L21.1708 10.0318C20.1769 5.62354 21.4151 3.86151 23.9515 0.258408C23.9702 0.231693 23.9351 0.202703 23.9123 0.226139L20.7939 3.44289V3.43221L9.23842 15.4055Z"/>
+    <path fill="currentColor" d="M7.65167 7.33217C5.24368 9.81392 4.75711 14.1176 7.57924 16.8984L7.57713 16.9005L0.0792788 23.8097C0.0528384 23.834 0.0162235 23.8015 0.0377551 23.7728C0.487937 23.1707 1.01883 22.595 1.54932 22.0198L1.57777 21.9889C3.28214 20.1411 4.97141 18.3097 3.93926 15.7216C2.55615 12.2552 3.36158 8.19287 5.9228 5.55089C8.58547 2.80639 12.507 2.1144 15.7826 3.5048C16.5072 3.78245 17.1388 4.17758 17.6315 4.54493L14.8964 5.84777C12.3497 4.7457 9.43229 5.49537 7.65167 7.33217Z"/>
+  </symbol>
+  <symbol id="bot" viewBox="-15 -15 259 259">
+    <path fill="currentColor" fill-rule="evenodd" d="M228.541 114.228C228.541 130.133 225.184 145.994 218.738 160.534C212.674 174.217 203.904 186.669 193.065 196.988C155.933 232.34 99.497 238.596 55.5255 212.24C45.097 205.99 35.6851 198.072 27.7451 188.866C19.1926 178.953 12.3686 167.569 7.65781 155.351C2.60712 142.264 0 128.257 0 114.228C0 98.3219 3.35751 82.4611 9.80315 67.9215C15.8672 54.2382 24.6377 41.7862 35.4767 31.4668C72.6081 -3.88483 129.044 -10.1413 173.016 16.2153C183.444 22.4653 192.856 30.3829 200.796 39.5896C209.349 49.5018 216.173 60.8859 220.883 73.1037C225.934 86.1906 228.541 100.198 228.541 114.228Z M130.36 45.98L132.71 46.19L134.98 46.81L137.11 47.83L138.97 49.28L140.47 51.09L141.68 53.12L142.73 55.23L143.76 57.36L144.78 59.49L145.79 61.62L146.79 63.76L147.76 65.91L148.71 68.07L149.63 70.25L150.52 72.43L151.37 74.63L151.99 76.91L152.10 79.26L151.64 81.57L150.59 83.68L149.04 85.45L147.10 86.78L144.90 87.62L142.56 87.93L140.22 87.71L137.98 86.99L135.93 85.82L134.17 84.24L132.78 82.34L131.69 80.25L130.77 78.08L129.87 75.89L128.94 73.72L128.00 71.56L127.03 69.40L126.05 67.26L125.05 65.12L124.03 62.99L122.93 60.90L121.87 58.79L121.03 56.59L120.72 54.26L121.10 51.93L122.15 49.83L123.75 48.10L125.76 46.89L128.01 46.19Z M176.61 37.08L178.72 37.59L180.70 38.48L182.52 39.65L184.20 41.03L185.71 42.59L187.03 44.31L188.20 46.14L189.26 48.03L190.27 49.96L191.26 51.89L192.23 53.84L193.16 55.80L194.05 57.78L194.92 59.77L195.74 61.78L196.53 63.80L197.27 65.84L197.97 67.90L198.47 70.01L198.63 72.18L198.40 74.33L197.58 76.33L195.95 77.72L193.83 78.08L191.71 77.65L189.76 76.69L188.03 75.38L186.53 73.82L185.28 72.05L184.25 70.13L183.40 68.14L182.63 66.11L181.87 64.07L181.07 62.05L180.25 60.04L179.39 58.05L178.49 56.07L177.57 54.10L176.61 52.15L175.62 50.22L174.59 48.31L173.53 46.41L172.54 44.48L171.86 42.42L171.76 40.26L172.62 38.30L174.45 37.19Z"/>
+  </symbol>
+  <symbol id="cursor" viewBox="-3 -3 30 30">
+    <path fill="currentColor" d="M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"/>
+  </symbol>
+</svg>
+
+<div class="scene">
+  <div class="menubar">
+    <div class="cluster"><svg class="ico" aria-hidden="true"><use href="#grok"/></svg>20% <span class="dim">4d</span></div>
+    <div class="cluster"><svg class="ico" aria-hidden="true"><use href="#bot"/></svg>8% <span class="dim">4d</span></div>
+    <div class="cluster"><svg class="ico" aria-hidden="true"><use href="#cursor"/></svg>34% <span class="dim">12%</span> <span class="dim">18d</span></div>
+  </div>
+  <div class="desk">
+    <div class="popover" id="pop">
+      <div class="arrow"></div>
+      <div class="hdr">
+        <button aria-label="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9c.3.6.9 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        </button>
+        <button aria-label="Refresh">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 3v6h-6"/></svg>
+        </button>
+      </div>
+
+      <div class="stack">
+        <section>
+          <div class="prov">
+            <svg class="mark ico"><use href="#grok"/></svg>
+            <h2>SuperGrok Heavy</h2>
+          </div>
+          <div class="row">
+            <span class="left">20% of weekly limit used</span>
+            <span class="right">Resets Aug 13, 3:46 PM</span>
+          </div>
+          <div class="meter" data-used="0.20" data-pace="0.69" data-days="7"></div>
+          <div class="products">
+            <div><span>Chat</span><span>11%</span></div>
+            <div><span>Build</span><span>9%</span></div>
+            <div><span>Imagine</span><span>0%</span></div>
+          </div>
+        </section>
+      </div>
+      <hr class="hr" />
+      <div class="stack">
+        <section>
+          <div class="prov">
+            <svg class="mark ico"><use href="#bot"/></svg>
+            <h2>Grok Bot</h2>
+          </div>
+          <div class="row">
+            <span class="left">8% of weekly limit used</span>
+            <span class="right">Resets Aug 13, 3:46 PM</span>
+          </div>
+          <div class="meter" data-used="0.08" data-pace="0.69" data-days="7"></div>
+        </section>
+      </div>
+      <hr class="hr" />
+      <div class="stack">
+        <section>
+          <div class="prov">
+            <svg class="mark ico"><use href="#cursor"/></svg>
+            <h2>Cursor Pro</h2>
+          </div>
+          <div class="row">
+            <span class="left">Cursor Models · 34% of monthly limit used</span>
+            <span class="right">Resets Sep 1, 12:00 AM</span>
+          </div>
+          <div class="meter" data-used="0.34" data-pace="0.40" data-days="0"></div>
+          <div class="row" style="margin-top:10px">
+            <span class="left">Other Models · 12% of monthly limit used</span>
+          </div>
+          <div class="meter" data-used="0.12" data-pace="0.40" data-days="0"></div>
+        </section>
+      </div>
+      <hr class="hr" />
+      <div class="quit">Quit GrokBar</div>
+    </div>
+  </div>
+</div>
+<script>
+  document.querySelectorAll('.meter').forEach((el) => {
+    const used = Number(el.dataset.used);
+    const pace = Number(el.dataset.pace);
+    const days = Number(el.dataset.days);
+    const fill = document.createElement('div');
+    fill.className = 'fill';
+    fill.style.width = (used * 100) + '%';
+    el.appendChild(fill);
+    if (days >= 2) {
+      for (let d = 1; d < days; d++) {
+        const t = document.createElement('div');
+        t.className = 'tick';
+        t.style.left = (d / days * 100) + '%';
+        el.appendChild(t);
+      }
+    }
+    if (!Number.isNaN(pace)) {
+      const p = document.createElement('div');
+      p.className = 'pace';
+      p.style.left = (pace * 100) + '%';
+      el.appendChild(p);
+    }
+  });
+  const q = new URLSearchParams(location.search);
+  if (q.get('theme') === 'light') document.body.classList.replace('dark', 'light');
+  if (q.get('crop') === '1') document.body.classList.add('crop');
+</script>
+</body>
+</html>
