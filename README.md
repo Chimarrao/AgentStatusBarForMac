@@ -1,11 +1,12 @@
 # GrokBar
 
 <p align="center">
-  <img src="docs/screenshots/menubar.png" alt="GrokBar in the macOS menu bar" width="720" />
+  <strong>Grok, Grok Bot, and Cursor usage in the Mac menu bar</strong>
 </p>
 
 <p align="center">
-  <strong>Grok, Grok Bot, and Cursor usage in the Mac menu bar</strong>
+  <img src="docs/screenshots/popover-dark.png" alt="GrokBar usage panel (dark)" width="360" />
+  <img src="docs/screenshots/popover-light.png" alt="GrokBar usage panel (light)" width="360" />
 </p>
 
 <p align="center">
@@ -19,6 +20,10 @@ Unofficial menu bar utility. Same information as [Grokbar for Omarchy](https://g
 ---
 
 ## Menu bar
+
+<p align="center">
+  <img src="docs/screenshots/menubar.png" alt="GrokBar in the macOS menu bar" width="720" />
+</p>
 
 Each enabled product is icon + percent + reset (`5d` / `12h`):
 
@@ -34,7 +39,7 @@ SuperGrok is on by default. Grok Bot and Cursor are off until you enable them in
 
 ## Popover
 
-Click the item for details that match the Omarchy panel:
+Click the item for the usage panel: plan, reset countdown, and product split. Same numbers as the Omarchy widget.
 
 - Plan name, weekly or monthly % used, reset date
 - Pace marker on the usage bar (where linear usage “should” be)
