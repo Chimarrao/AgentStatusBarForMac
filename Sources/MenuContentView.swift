@@ -7,6 +7,9 @@ struct MenuContentView: View {
     @State private var grokIdentityOpen = false
     @State private var grokBotIdentityOpen = false
     @State private var cursorIdentityOpen = false
+    @State private var claudeIdentityOpen = false
+    @State private var codexIdentityOpen = false
+    @State private var antigravityIdentityOpen = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -67,20 +70,14 @@ struct MenuContentView: View {
             outageBanner
         }
 
+        let cards: [(id: String, card: AnyView)] = visibleCards
         VStack(alignment: .leading, spacing: 14) {
-            if model.showGrokUsage {
-                grokCard
+            ForEach(Array(cards.enumerated()), id: \.element.id) { index, item in
+                if index > 0 { Divider() }
+                item.card
             }
-            if model.showGrokBotUsage {
-                if model.showGrokUsage { Divider() }
-                grokBotCard
-            }
-            if model.showCursorUsage {
-                if model.showGrokUsage || model.showGrokBotUsage { Divider() }
-                cursorCard
-            }
-            if !model.showGrokUsage && !model.showGrokBotUsage && !model.showCursorUsage {
-                Text("Turn on SuperGrok, Grok Bot, or Cursor in Settings.")
+            if cards.isEmpty {
+                Text("No signed-in agents found. Sign in to Claude Code, Codex, Grok or Cursor.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -89,7 +86,7 @@ struct MenuContentView: View {
 
         Divider()
         HStack {
-            Button("Quit GrokBar") {
+            Button("Quit AgentStatusBar") {
                 model.quit()
             }
             .buttonStyle(.borderless)
@@ -100,13 +97,57 @@ struct MenuContentView: View {
         }
     }
 
+    /// Only providers that are enabled and signed in (or still loading / needing a refresh).
+    private var visibleCards: [(id: String, card: AnyView)] {
+        var out: [(id: String, card: AnyView)] = []
+        if model.showClaudeUsage, model.claudeSnapshot != nil || model.claudeMessage != nil {
+            out.append(("claude", AnyView(claudeCard)))
+        }
+        if model.showCodexUsage, model.codexSnapshot != nil || model.codexMessage != nil {
+            out.append(("codex", AnyView(codexCard)))
+        }
+        if model.showAntigravityUsage, model.antigravitySnapshot != nil || model.antigravityMessage != nil {
+            out.append(("antigravity", AnyView(antigravityCard)))
+        }
+        if model.showGrokUsage {
+            var signedOut = false
+            if case .unavailable = model.state { signedOut = true }
+            if !signedOut { out.append(("grok", AnyView(grokCard))) }
+        }
+        if model.showGrokBotUsage, model.grokBotSnapshot != nil || model.grokBotMessage != nil {
+            out.append(("bot", AnyView(grokBotCard)))
+        }
+        if model.showCursorUsage, model.cursorSnapshot != nil || model.cursorMessage != nil {
+            out.append(("cursor", AnyView(cursorCard)))
+        }
+        return out
+    }
+
     private var settingsPage: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Show in Menu Bar")
                 .font(.headline)
+            Toggle("Claude", isOn: $model.showClaudeUsage)
+            Toggle("Codex", isOn: $model.showCodexUsage)
+            Toggle("Antigravity", isOn: $model.showAntigravityUsage)
             Toggle("SuperGrok", isOn: $model.showGrokUsage)
             Toggle("Grok Bot", isOn: $model.showGrokBotUsage)
             Toggle("Cursor", isOn: $model.showCursorUsage)
+            Divider()
+            HStack {
+                Text("Refresh usage every")
+                    .font(.callout)
+                Spacer()
+                Picker("", selection: $model.pollInterval) {
+                    Text("30 sec").tag(30.0)
+                    Text("1 min").tag(60.0)
+                    Text("5 min").tag(300.0)
+                    Text("10 min").tag(600.0)
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize()
+            }
             Text("Grok Bot and Cursor use your Cursor session when it matches the Grok account.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -114,6 +155,177 @@ struct MenuContentView: View {
         }
         .toggleStyle(.checkbox)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var claudeCard: some View {
+        if let snap = model.claudeSnapshot {
+            providerHeader(
+                icon: ProviderIcons.claude,
+                title: snap.planName,
+                name: nil,
+                email: nil,
+                identityOpen: $claudeIdentityOpen
+            )
+            ForEach(snap.pools, id: \.label) { pool in
+                poolBlock(pool)
+            }
+            creditsBlock(snap.creditRows)
+            staleNote(snap.fetchedAt, model.claudeMessage)
+        } else if let message = model.claudeMessage {
+            providerHeader(
+                icon: ProviderIcons.claude,
+                title: "Claude",
+                name: nil,
+                email: nil,
+                identityOpen: $claudeIdentityOpen
+            )
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if model.isRefreshing {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Loading Claude…")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+
+
+    @ViewBuilder
+    private func creditsBlock(_ rows: [CreditRow]) -> some View {
+        if !rows.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Extra credits")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                ForEach(rows, id: \.label) { row in
+                    HStack {
+                        Text(row.label)
+                            .font(.callout)
+                        Spacer(minLength: 8)
+                        Text(row.value)
+                            .font(.callout.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private func grokCreditRows(_ snap: UsageSnapshot) -> [CreditRow] {
+        guard let cents = snap.prepaidBalanceCents, cents > 0 else { return [] }
+        return [CreditRow(label: "Balance", value: formatUSD(cents: cents))]
+    }
+
+    private func staleNote(_ fetchedAt: Date, _ message: String?) -> some View {
+        Group {
+            if let message, !message.isEmpty {
+                Text("Showing last update from \(fetchedAt.formatted(date: .omitted, time: .shortened)). \(message)")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func poolBlock(_ pool: UsagePool) -> some View {
+        let start = pool.resetsAt.map { $0.addingTimeInterval(-pool.windowSeconds) }
+        return usageBlock(
+            usedLabel: "\(pool.label) · \(Int(pool.percent.rounded()))% used",
+            reset: pool.resetsAt,
+            usedFraction: pool.percent / 100,
+            pace: expectedPace(start: start, end: pool.resetsAt, fallbackDays: pool.windowSeconds / 86_400),
+            dayCount: pool.label == "Weekly" ? 7 : 0
+        )
+    }
+
+    private func claudeSubRow(_ name: String, _ percent: Double) -> some View {
+        HStack {
+            Text("\(name) weekly")
+                .font(.callout)
+            Spacer(minLength: 8)
+            Text("\(Int(percent.rounded()))%")
+                .font(.callout.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var codexCard: some View {
+        if let snap = model.codexSnapshot {
+            providerHeader(
+                icon: ProviderIcons.codex,
+                title: snap.planName,
+                name: nil,
+                email: nil,
+                identityOpen: $codexIdentityOpen
+            )
+            ForEach(snap.pools, id: \.label) { pool in
+                poolBlock(pool)
+            }
+            creditsBlock(snap.creditRows)
+            staleNote(snap.fetchedAt, model.codexMessage)
+        } else if let message = model.codexMessage {
+            providerHeader(
+                icon: ProviderIcons.codex,
+                title: "Codex",
+                name: nil,
+                email: nil,
+                identityOpen: $codexIdentityOpen
+            )
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if model.isRefreshing {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Loading Codex…")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var antigravityCard: some View {
+        if let snap = model.antigravitySnapshot {
+            providerHeader(
+                icon: ProviderIcons.antigravity,
+                title: "Antigravity",
+                name: nil,
+                email: nil,
+                identityOpen: $antigravityIdentityOpen
+            )
+            ForEach(snap.groups, id: \.name) { group in
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(group.name)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    ForEach(group.pools, id: \.label) { pool in
+                        poolBlock(pool)
+                    }
+                }
+            }
+            staleNote(snap.fetchedAt, model.antigravityMessage)
+        } else if let message = model.antigravityMessage {
+            providerHeader(
+                icon: ProviderIcons.antigravity,
+                title: "Antigravity",
+                name: nil,
+                email: nil,
+                identityOpen: $antigravityIdentityOpen
+            )
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     @ViewBuilder
@@ -148,6 +360,8 @@ struct MenuContentView: View {
                     }
                 }
             }
+
+            creditsBlock(grokCreditRows(snap))
 
         case .unavailable(let title, let hint):
             Text(title)
@@ -243,6 +457,7 @@ struct MenuContentView: View {
                 start: snap.periodStart,
                 showReset: false
             )
+            staleNote(snap.fetchedAt, model.cursorMessage)
         } else if let message = model.cursorMessage {
             providerHeader(
                 icon: ProviderIcons.cursor,
@@ -276,7 +491,7 @@ struct MenuContentView: View {
             HStack(alignment: .center, spacing: 8) {
                 Image(nsImage: icon)
                     .resizable()
-                    .renderingMode(.template)
+                    .renderingMode(icon.isTemplate ? .template : .original)
                     .frame(width: 16, height: 16)
                     .foregroundStyle(.primary)
                 Button {
@@ -402,36 +617,25 @@ private struct UsageMeter: View {
     var overPace: Bool
     var dayCount: Int
 
+    /// Plain blue; warms up only when the pool is nearly gone.
     private var fill: Color {
-        overPace ? Color.red : Color.accentColor
+        switch used {
+        case 0.95...: return .red
+        case 0.8...: return .orange
+        default: return .accentColor
+        }
     }
 
     var body: some View {
         GeometryReader { geo in
             let width = geo.size.width
-            let height = geo.size.height
             ZStack(alignment: .leading) {
                 Capsule()
                     .fill(Color.primary.opacity(0.12))
-                Capsule()
-                    .fill(fill)
-                    .frame(width: max(4, width * min(max(used, 0), 1)))
-
-                if dayCount >= 2 {
-                    ForEach(1..<dayCount, id: \.self) { day in
-                        let x = width * CGFloat(day) / CGFloat(dayCount)
-                        Capsule()
-                            .fill(Color.primary.opacity(0.28))
-                            .frame(width: 1, height: height * 0.78)
-                            .offset(x: x - 0.5)
-                    }
-                }
-
-                if let pace, pace >= 0 {
+                if used > 0 {
                     Capsule()
-                        .fill(Color.accentColor)
-                        .frame(width: 2, height: height)
-                        .offset(x: width * CGFloat(min(max(pace, 0), 1)) - 1)
+                        .fill(fill)
+                        .frame(width: max(8, width * min(max(used, 0), 1)))
                 }
             }
         }

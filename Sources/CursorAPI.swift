@@ -128,7 +128,7 @@ enum CursorAPI {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("1", forHTTPHeaderField: "Connect-Protocol-Version")
-        request.setValue("grokbar/1.1", forHTTPHeaderField: "User-Agent")
+        request.setValue("agentstatusbar/1.1", forHTTPHeaderField: "User-Agent")
         request.httpBody = Data("{}".utf8)
 
         let data: Data

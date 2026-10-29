@@ -1,130 +1,75 @@
-# GrokBar
+# AgentStatusBarForMac — Claude | Codex | Antigravity | Grok | Cursor
 
-<p align="center">
-  <strong>Grok, Grok Bot, and Cursor usage in the Mac menu bar</strong>
-</p>
+Usage meters for your AI coding agents, in the Mac menu bar.
 
-<p align="center">
-  <img src="docs/screenshots/panel-dark.png" alt="GrokBar usage panel on the Mac menu bar" width="720" />
-</p>
+> **This is a fork of [pixbroker/grokbar](https://github.com/pixbroker/grokbar).** The architecture, the Grok and Cursor providers, the status-item renderer and the SwiftUI popover are all [@pixbroker](https://github.com/pixbroker)'s work, published under the MIT license. Thank you for the original project. This fork adds more providers and changes the look; see [What changed](#what-changed).
 
-<p align="center">
-  <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue" alt="macOS 14+" />
-  <img src="https://img.shields.io/badge/Swift-6-orange" alt="Swift 6" />
-  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT" />
-</p>
-
-Unofficial menu bar utility. Same information as [Grokbar for Omarchy](https://github.com/pixbroker/grokbar-omarchy): SuperGrok weekly pool, optional Grok Bot weekly pool, optional Cursor monthly pools. Native AppKit status item and SwiftUI popover.
-
----
+Unofficial. Native AppKit status item + SwiftUI popover, no dependencies, no telemetry.
 
 ## Menu bar
 
-<p align="center">
-  <img src="docs/screenshots/menubar.png" alt="GrokBar in the macOS menu bar" width="720" />
-</p>
+Each signed-in provider is its logo followed by its usage, `5h% | weekly%`:
 
-Each enabled product is icon + percent + reset (`5d` / `12h`):
+```
+✳ 44% | 58%   ☁ 87%   ◭ 12% | 3%   ⊘ 39%
+Claude          Codex     Antigravity  Grok
+```
 
-| Cluster | Meaning |
-|---------|---------|
-| **Grok mark** | SuperGrok weekly pool used, time until reset |
-| **Grok Bot face** | Grok Bot weekly pool used, time until reset |
-| **Cursor mark** | Cursor Models %, Other Models %, time until billing reset |
+Providers you are not signed in to are hidden, in the menu bar and in the popover. A pool that is monthly (Codex Go, Cursor) shows as one number, and extra windows follow the same `a | b` pattern.
 
-SuperGrok is on by default. Grok Bot and Cursor are off until you enable them in the popover (**gear → Show in Menu Bar**). SuperGrok can be turned off too.
+## Providers
 
----
+| Provider | Shows | Reads from |
+|----------|-------|-----------|
+| **Claude** | Session (5h), Weekly, usage credits spent | Claude Code sign-in (macOS Keychain item `Claude Code-credentials`, or `~/.claude/.credentials.json`) |
+| **Codex** | Session / Weekly / Monthly (whatever your plan has), credits | `~/.codex/auth.json` (or `$CODEX_HOME`) |
+| **Antigravity** | 5h + weekly for *Gemini* and *Claude & GPT* model groups | the official `agy -p /usage` (Antigravity CLI), no credentials touched |
+| **Grok** | SuperGrok weekly pool, per-product split, prepaid balance | `~/.grok/auth.json` |
+| **Cursor** | Cursor Models / Other Models monthly pools, Grok Bot | Cursor's local session |
 
-## Popover
+Usage credits / prepaid balances are listed only when the account actually has them.
 
-<p align="center">
-  <img src="docs/screenshots/panel-light.png" alt="GrokBar usage panel (light)" width="720" />
-</p>
-
-Click the item for the usage panel: plan, reset countdown, and product split. Same numbers as the Omarchy widget.
-
-- Plan name, weekly or monthly % used, reset date
-- Pace marker on the usage bar (where linear usage “should” be)
-- SuperGrok product split (Chat, Build, Imagine, Voice, API)
-- Cursor Models / Other Models as two monthly bars
-- Account name and email (click the plan title)
-- Gear for visibility toggles, circular arrow to refresh
-- xAI status banner when [status.x.ai](https://status.x.ai/) declares an incident
-
----
+Settings (gear icon): toggle each provider, and choose how often to read usage (30 s, 1, 5 or 10 min). If a read fails, the last good numbers stay on screen with a note.
 
 ## Requirements
 
-- **macOS 14** or later
-- SuperGrok: [Grok Build](https://x.ai/build) signed in (`grok login`) so `~/.grok/auth.json` exists
-- Grok Bot / Cursor: Cursor signed in on this Mac, **same account email as Grok**
-
-```bash
-grok login   # only if ~/.grok/auth.json is missing
-```
-
----
+- macOS 14+, Xcode command line tools (`swiftc`)
+- Be signed in to the tools you want to see: `claude`, `codex`, `agy`, `grok login`, Cursor
 
 ## Install
 
 ```bash
-git clone https://github.com/pixbroker/grokbar.git
-cd grokbar
+git clone https://github.com/Chimarrao/AgentStatusBarForMac.git
+cd AgentStatusBarForMac
 bash build.sh
-cp -R "build/GrokBar.app" /Applications/
-open /Applications/GrokBar.app
+cp -R build/AgentStatusBarForMac.app /Applications/
+open /Applications/AgentStatusBarForMac.app
 ```
 
-Xcode (or Xcode-beta) is required. **Launch at Login** is registered on first run. Allow GrokBar under **System Settings → General → Login Items** if macOS asks.
+`build.sh` builds for your Mac's architecture (Apple Silicon or Intel). The build is ad-hoc signed: on first launch use **right-click → Open** if Gatekeeper warns. The app registers as a login item.
 
-Ad-hoc signed builds: first open via **right-click → Open** if Gatekeeper warns.
+## What changed
 
----
+Compared with the original GrokBar:
 
-## Behavior
+- New providers: **Claude**, **Codex** and **Antigravity**, with official-style logos in the menu bar.
+- Menu bar shows only percentages, as `5h% | weekly%`, per provider; signed-out providers are hidden.
+- Cleaner usage bars (no pace marker or day ticks); blue, turning orange at 80% and red at 95%.
+- Extra-credits section (Claude, Codex, Grok) when present.
+- Configurable refresh interval; last good value kept on errors.
+- Builds natively on Intel Macs (the original build script hard-coded `arm64`).
+- Renamed to AgentStatusBarForMac.
 
-| Situation | What you see |
-|-----------|----------------|
-| SuperGrok signed in | Grok cluster with weekly % and countdown |
-| Grok Bot enabled, matching Cursor session | Bot cluster with weekly % |
-| Cursor enabled, matching Cursor session | Cursor Models %, Other Models %, monthly reset |
-| Cursor signed in as a different account | Hidden; popover explains the mismatch |
-| Not signed in to Grok | `—` and a setup hint; re-checks about every 2 minutes |
-| Network blip | Last good SuperGrok snapshot stays in the menu bar |
-| Active xAI incident | `⚠` plus a banner in the popover |
+## Privacy and caveats
 
-Background refresh is about **every 20 minutes** when healthy, **~5 minutes** during a declared outage, and **~2 minutes** while waiting for setup. Opening the popover refreshes if data is older than **15 minutes**. The countdown ticks locally every minute.
+- Reads local sign-in files / Keychain items of the tools above, and talks only to those providers' usage endpoints (plus the public xAI status feed). It never sends chats, code or project files and makes no model requests.
+- It does **not** refresh Claude, Codex or Antigravity tokens (those tools rotate refresh tokens); if one expires, open that tool once.
+- **Claude:** uses Anthropic's undocumented `/api/oauth/usage` endpoint. That endpoint rate-limits unknown clients almost to zero, so the app sends `User-Agent: claude-code/<your installed version>`, like other community usage monitors. This may not be allowed by Anthropic's terms and can break at any time. Use at your own risk.
+- **Codex** uses an undocumented ChatGPT backend endpoint (`/backend-api/wham/usage`), also unofficial.
+- Claude's usage-credit *balance* is not exposed by the API, so only credits spent are shown.
 
----
+## License and credits
 
-## Privacy
+[MIT](LICENSE). Original work © 2026 pixbroker ([pixbroker/grokbar](https://github.com/pixbroker/grokbar)); modifications © 2026 Lucas Reolon.
 
-| Action | Detail |
-|--------|--------|
-| **Read** | `~/.grok/auth.json`; Cursor `state.vscdb` / CLI `auth.json` |
-| **Write** | May refresh Grok OIDC tokens in `~/.grok/auth.json` |
-| **Network** | `auth.x.ai`, `cli-chat-proxy.grok.com`, `api2.cursor.sh` (usage metadata), `status.x.ai/feed.xml` |
-| **Not sent** | Chats, code, project files |
-
-No inference or completions — only usage, subscription metadata, and the public status feed.
-
----
-
-## How it works
-
-1. Load Grok OIDC credentials from `~/.grok/auth.json` (same file as `grok`).
-2. Refresh the access token when near expiry (`auth.x.ai/oauth2/token`).
-3. Fetch SuperGrok billing (`/v1/billing?format=credits`) plus plan/profile when available.
-4. If Grok Bot or Cursor is enabled, load the Cursor session and call `GetCurrentPeriodUsage` / `GetSandUsageStatus` only when the Cursor email matches Grok.
-5. Fetch the public xAI status RSS feed.
-6. Cache the last good SuperGrok snapshot under Application Support.
-7. Register as a login item via `SMAppService`.
-
----
-
-## License
-
-[MIT](LICENSE)
-
-Not affiliated with xAI or Anysphere. Grok, Grok Bot, and Cursor are property of their owners.
+Not affiliated with Anthropic, OpenAI, Google, xAI or Anysphere. Claude, Codex, Antigravity, Grok and Cursor names and logos belong to their owners and are used only to identify each provider.

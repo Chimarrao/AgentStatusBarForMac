@@ -9,7 +9,7 @@ import SwiftUI
 /// We pin to the leading edge of that strip — the leftmost status item.
 @MainActor
 final class StatusBarController: NSObject {
-    static let autosaveName = "GrokBar"
+    static let autosaveName = "AgentStatusBar"
 
     private let model: UsageViewModel
     private var statusItem: NSStatusItem?
@@ -93,6 +93,30 @@ final class StatusBarController: NSObject {
             .sink { [weak self] _ in self?.updateButton() }
             .store(in: &cancellables)
         model.$showCursorUsage
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateButton() }
+            .store(in: &cancellables)
+        model.$showCodexUsage
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateButton() }
+            .store(in: &cancellables)
+        model.$codexSnapshot
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateButton() }
+            .store(in: &cancellables)
+        model.$showAntigravityUsage
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateButton() }
+            .store(in: &cancellables)
+        model.$antigravitySnapshot
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateButton() }
+            .store(in: &cancellables)
+        model.$showClaudeUsage
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateButton() }
+            .store(in: &cancellables)
+        model.$claudeSnapshot
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.updateButton() }
             .store(in: &cancellables)

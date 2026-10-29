@@ -234,10 +234,14 @@ func formatCountdown(_ interval: TimeInterval?, compact: Bool = false) -> String
     let minutes = (total % 3_600) / 60
 
     if compact {
+        // Exact remaining time: "4d19h", "4h43m", "12m".
         if days >= 1 {
-            return "\(days)d"
+            return hours > 0 ? "\(days)d\(hours)h" : "\(days)d"
         }
-        return "\(max(hours, 1))h"
+        if hours >= 1 {
+            return "\(hours)h\(String(format: "%02d", minutes))m"
+        }
+        return "\(max(minutes, 1))m"
     }
 
     // Detail panel: always include days and hours when a full day or more remains.

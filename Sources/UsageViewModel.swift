@@ -13,6 +13,12 @@ final class UsageViewModel: ObservableObject {
     @Published private(set) var cursorMessage: String?
     @Published private(set) var grokBotSnapshot: GrokBotSnapshot?
     @Published private(set) var grokBotMessage: String?
+    @Published private(set) var claudeSnapshot: ClaudeSnapshot?
+    @Published private(set) var claudeMessage: String?
+    @Published private(set) var codexSnapshot: CodexSnapshot?
+    @Published private(set) var codexMessage: String?
+    @Published private(set) var antigravitySnapshot: AntigravitySnapshot?
+    @Published private(set) var antigravityMessage: String?
 
     @Published var showGrokUsage: Bool {
         didSet {
@@ -41,7 +47,52 @@ final class UsageViewModel: ObservableObject {
         }
     }
 
+    @Published var showClaudeUsage: Bool {
+        didSet {
+            UserDefaults.standard.set(showClaudeUsage, forKey: PrefKey.showClaude)
+            if !showClaudeUsage {
+                claudeSnapshot = nil
+                claudeMessage = nil
+            }
+            if didStart { refresh(force: true) }
+        }
+    }
+
+    @Published var showAntigravityUsage: Bool {
+        didSet {
+            UserDefaults.standard.set(showAntigravityUsage, forKey: PrefKey.showAntigravity)
+            if !showAntigravityUsage {
+                antigravitySnapshot = nil
+                antigravityMessage = nil
+            }
+            if didStart { refresh(force: true) }
+        }
+    }
+
+    @Published var showCodexUsage: Bool {
+        didSet {
+            UserDefaults.standard.set(showCodexUsage, forKey: PrefKey.showCodex)
+            if !showCodexUsage {
+                codexSnapshot = nil
+                codexMessage = nil
+            }
+            if didStart { refresh(force: true) }
+        }
+    }
+
+    /// Seconds between automatic usage reads (30 s, 1, 5 or 10 min).
+    @Published var pollInterval: Double {
+        didSet {
+            UserDefaults.standard.set(pollInterval, forKey: PrefKey.pollInterval)
+            if didStart { scheduleBackgroundPoll() }
+        }
+    }
+
     private enum PrefKey {
+        static let pollInterval = "pollIntervalSeconds"
+        static let showCodex = "showCodexUsage"
+        static let showAntigravity = "showAntigravityUsage"
+        static let showClaude = "showClaudeUsage"
         static let showGrok = "showGrokUsage"
         static let showBot = "showGrokBotUsage"
         static let showCursor = "showCursorUsage"
@@ -53,8 +104,7 @@ final class UsageViewModel: ObservableObject {
     private var didStart = false
     private var lastFetchAttemptAt: Date?
 
-    private let staleAfter: TimeInterval = 15 * 60
-    private let backgroundPollInterval: TimeInterval = 20 * 60
+    private var staleAfter: TimeInterval { max(pollInterval - 5, 10) }
     private let setupPollInterval: TimeInterval = 2 * 60
     private let outagePollInterval: TimeInterval = 5 * 60
 
@@ -65,6 +115,12 @@ final class UsageViewModel: ObservableObject {
         showGrokUsage = defaults.object(forKey: PrefKey.showGrok) as? Bool ?? true
         showGrokBotUsage = defaults.bool(forKey: PrefKey.showBot)
         showCursorUsage = defaults.bool(forKey: PrefKey.showCursor)
+        let savedInterval = defaults.double(forKey: PrefKey.pollInterval)
+        pollInterval = [30, 60, 300, 600].contains(savedInterval) ? savedInterval : 300
+        showCodexUsage = defaults.object(forKey: PrefKey.showCodex) as? Bool ?? true
+        showAntigravityUsage = defaults.object(forKey: PrefKey.showAntigravity) as? Bool ?? true
+        claudeSnapshot = ClaudeAPI.cachedSnapshot()
+        showClaudeUsage = defaults.object(forKey: PrefKey.showClaude) as? Bool ?? true
     }
 
     var hasActiveOutage: Bool {
@@ -79,6 +135,14 @@ final class UsageViewModel: ObservableObject {
         _ = clockTick
         let outage = hasActiveOutage
         var parts: [String] = []
+        if showCodexUsage {
+            if let snap = codexSnapshot {
+                parts.append(Self.poolsBarText(snap.pools))
+            }
+        }
+        if showAntigravityUsage, let snap = antigravitySnapshot {
+            parts.append(Self.poolsBarText(snap.barPools))
+        }
         if showGrokUsage {
             switch state {
             case .loaded(let snap):
@@ -111,6 +175,11 @@ final class UsageViewModel: ObservableObject {
                 parts.append("—")
             }
         }
+        if showClaudeUsage {
+            if let snap = claudeSnapshot {
+                parts.append(Self.poolsBarText(snap.pools))
+            }
+        }
         if parts.isEmpty {
             return outage ? "⚠" : "—"
         }
@@ -126,6 +195,28 @@ final class UsageViewModel: ObservableObject {
         var parts: [String] = []
         if let status = serviceStatus, status.hasActiveIncident {
             parts.append("xAI status issue: \(status.headline)")
+        }
+        if showCodexUsage {
+            if let snap = codexSnapshot {
+                let text = snap.pools.map { pool -> String in
+                    var t = "Codex \(pool.label.lowercased()) \(Int(pool.percent.rounded()))% used"
+                    if let reset = formatCountdown(pool.resetsIn) { t += ", resets in \(reset)" }
+                    return t
+                }
+                parts.append(text.joined(separator: ". "))
+            } else if let codexMessage {
+                parts.append("Codex: \(codexMessage)")
+            }
+        }
+        if showAntigravityUsage {
+            if let snap = antigravitySnapshot {
+                let text = snap.groups.map { group in
+                    group.name + ": " + group.pools.map { "\($0.label.lowercased()) \(Int($0.percent.rounded()))% used" }.joined(separator: ", ")
+                }
+                parts.append("Antigravity " + text.joined(separator: "; "))
+            } else if let antigravityMessage {
+                parts.append("Antigravity: \(antigravityMessage)")
+            }
         }
         if showGrokUsage {
             switch state {
@@ -160,8 +251,20 @@ final class UsageViewModel: ObservableObject {
                 parts.append("Cursor: \(cursorMessage)")
             }
         }
+        if showClaudeUsage {
+            if let snap = claudeSnapshot {
+                let text = snap.pools.map { pool -> String in
+                    var t = "Claude \(pool.label.lowercased()) \(Int(pool.percent.rounded()))% used"
+                    if let reset = formatCountdown(pool.resetsIn) { t += ", resets in \(reset)" }
+                    return t
+                }
+                parts.append(text.joined(separator: ". "))
+            } else if let claudeMessage {
+                parts.append("Claude: \(claudeMessage)")
+            }
+        }
         if parts.isEmpty {
-            parts.append("GrokBar. Open to choose what to show.")
+            parts.append("AgentStatusBar. Open to choose what to show.")
         }
         return parts.joined(separator: ". ")
     }
@@ -202,6 +305,9 @@ final class UsageViewModel: ObservableObject {
 
     private var isStale: Bool {
         if hasActiveOutage { return true }
+        if showClaudeUsage, claudeSnapshot == nil { return true }
+        if showCodexUsage, codexSnapshot == nil { return true }
+        if showAntigravityUsage, antigravitySnapshot == nil { return true }
         if showGrokUsage, case .loaded(let snap) = state {
             if Date().timeIntervalSince(snap.fetchedAt) < staleAfter {
                 // Still stale if an enabled extra has no snapshot yet.
@@ -241,6 +347,9 @@ final class UsageViewModel: ObservableObject {
         let includeGrok = showGrokUsage
         let includeCursor = showCursorUsage
         let includeBot = showGrokBotUsage
+        let includeClaude = showClaudeUsage
+        let includeCodex = showCodexUsage
+        let includeAntigravity = showAntigravityUsage
 
         fetchTask = Task { [weak self] in
             defer {
@@ -255,7 +364,10 @@ final class UsageViewModel: ObservableObject {
                 await Self.fetchInBackground(
                     includeGrok: includeGrok,
                     includeCursor: includeCursor,
-                    includeGrokBot: includeBot
+                    includeGrokBot: includeBot,
+                    includeClaude: includeClaude,
+                    includeCodex: includeCodex,
+                    includeAntigravity: includeAntigravity
                 )
             }.value
 
@@ -327,7 +439,6 @@ final class UsageViewModel: ObservableObject {
                 cursorSnapshot = snap
                 cursorMessage = snap.statusMessage
             case .failure(let error):
-                cursorSnapshot = nil
                 cursorMessage = error.localizedDescription
             case .none:
                 break
@@ -335,6 +446,67 @@ final class UsageViewModel: ObservableObject {
         } else {
             cursorSnapshot = nil
             cursorMessage = nil
+        }
+
+        if showClaudeUsage {
+            switch result.claude {
+            case .success(let snap):
+                claudeSnapshot = snap
+                claudeMessage = nil
+            case .failure(let error):
+                // Keep the last good numbers on any error; only sign-out clears them.
+                if case ClaudeError.notSignedIn = error {
+                    claudeSnapshot = nil
+                    claudeMessage = nil
+                } else {
+                    claudeMessage = error.localizedDescription
+                }
+            case .none:
+                break
+            }
+        } else {
+            claudeSnapshot = nil
+            claudeMessage = nil
+        }
+
+        if showCodexUsage {
+            switch result.codex {
+            case .success(let snap):
+                codexSnapshot = snap
+                codexMessage = nil
+            case .failure(let error):
+                if case CodexError.notSignedIn = error {
+                    codexSnapshot = nil
+                    codexMessage = nil
+                } else {
+                    codexMessage = error.localizedDescription
+                }
+            case .none:
+                break
+            }
+        } else {
+            codexSnapshot = nil
+            codexMessage = nil
+        }
+
+        if showAntigravityUsage {
+            switch result.antigravity {
+            case .success(let snap):
+                antigravitySnapshot = snap
+                antigravityMessage = nil
+            case .failure(let error):
+                if case AntigravityError.notInstalled = error {
+                    antigravitySnapshot = nil
+                    antigravityMessage = nil
+                } else {
+                    antigravityMessage = error.localizedDescription
+                }
+            case .none:
+                break
+            }
+        } else {
+            antigravitySnapshot = nil
+            antigravityMessage = nil
         }
 
         if showGrokBotUsage {
@@ -388,7 +560,7 @@ final class UsageViewModel: ObservableObject {
                 return ClassifiedError(
                     kind: .setup,
                     menuMessage: "Grok session expired.",
-                    hint: "Run `grok login` again. GrokBar will recover on the next check."
+                    hint: "Run `grok login` again. AgentStatusBar will recover on the next check."
                 )
             }
             if fetch.isTransient {
@@ -417,13 +589,19 @@ final class UsageViewModel: ObservableObject {
         var usage: Result<(AuthIdentity, UsageSnapshot), Error>?
         var cursor: Result<CursorSnapshot, Error>?
         var grokBot: Result<GrokBotSnapshot, Error>?
+        var claude: Result<ClaudeSnapshot, Error>?
+        var codex: Result<CodexSnapshot, Error>?
+        var antigravity: Result<AntigravitySnapshot, Error>?
         var serviceStatus: ServiceStatusSnapshot?
     }
 
     private nonisolated static func fetchInBackground(
         includeGrok: Bool,
         includeCursor: Bool,
-        includeGrokBot: Bool
+        includeGrokBot: Bool,
+        includeClaude: Bool,
+        includeCodex: Bool,
+        includeAntigravity: Bool
     ) async -> CombinedFetch {
         async let statusTask: ServiceStatusSnapshot? = {
             try? await StatusFetcher.fetch()
@@ -451,8 +629,23 @@ final class UsageViewModel: ObservableObject {
             }
         }
 
+        var claude: Result<ClaudeSnapshot, Error>?
+        if includeClaude {
+            claude = await captured { try await ClaudeAPI.fetch() }
+        }
+
+        var codex: Result<CodexSnapshot, Error>?
+        if includeCodex {
+            codex = await captured { try await CodexAPI.fetch() }
+        }
+
+        var antigravity: Result<AntigravitySnapshot, Error>?
+        if includeAntigravity {
+            antigravity = await captured { try await AntigravityAPI.fetch() }
+        }
+
         let status = await statusTask
-        return CombinedFetch(usage: usage, cursor: cursor, grokBot: grokBot, serviceStatus: status)
+        return CombinedFetch(usage: usage, cursor: cursor, grokBot: grokBot, claude: claude, codex: codex, antigravity: antigravity, serviceStatus: status)
     }
 
     private nonisolated static func fetchGrok() async -> Result<(AuthIdentity, UsageSnapshot), Error> {
@@ -500,6 +693,18 @@ final class UsageViewModel: ObservableObject {
         }
     }
 
+    func openClaudeUsagePage() {
+        if let url = URL(string: "https://claude.ai/settings/usage") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    static func poolsBarText(_ pools: [UsagePool]) -> String {
+        pools.map { pool in
+            "\(Int(pool.percent.rounded()))%"
+        }.joined(separator: " | ")
+    }
+
     func openCursorDashboard() {
         if let url = URL(string: "https://cursor.com/dashboard/usage") {
             NSWorkspace.shared.open(url)
@@ -521,12 +726,12 @@ final class UsageViewModel: ObservableObject {
 
     private var currentPollInterval: TimeInterval {
         if hasActiveOutage {
-            return outagePollInterval
+            return min(outagePollInterval, pollInterval)
         }
         if case .unavailable = state {
-            return setupPollInterval
+            return min(setupPollInterval, pollInterval)
         }
-        return backgroundPollInterval
+        return pollInterval
     }
 
     private func scheduleBackgroundPoll() {
@@ -553,11 +758,7 @@ final class UsageViewModel: ObservableObject {
     }
 
     private func formatBar(percent: Double, resetsIn: TimeInterval?) -> String {
-        let pct = Int(percent.rounded())
-        if let countdown = formatCountdown(resetsIn, compact: true) {
-            return "\(pct)% \(countdown)"
-        }
-        return "\(pct)%"
+        "\(Int(percent.rounded()))%"
     }
 }
 

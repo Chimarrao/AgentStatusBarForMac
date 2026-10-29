@@ -41,9 +41,9 @@ enum AuthStoreError: LocalizedError {
     var recoveryHint: String {
         switch self {
         case .missingGrokHome:
-            return "Install Grok Build, run `grok login`, then GrokBar will pick it up."
+            return "Install Grok Build, run `grok login`, then AgentStatusBar will pick it up."
         case .missingAuthFile, .noAccessToken:
-            return "Run `grok login` in a terminal. GrokBar watches for sign-in automatically."
+            return "Run `grok login` in a terminal. AgentStatusBar watches for sign-in automatically."
         case .invalidAuthJSON:
             return "Run `grok login` again to recreate the auth file."
         case .noRefreshToken, .sessionExpired:
@@ -200,7 +200,7 @@ enum AuthStore {
         request.timeoutInterval = 20
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("grokbar/1.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("agentstatusbar/1.0", forHTTPHeaderField: "User-Agent")
 
         var components = URLComponents()
         components.queryItems = [

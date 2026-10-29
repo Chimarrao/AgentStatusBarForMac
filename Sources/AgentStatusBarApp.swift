@@ -3,7 +3,7 @@ import ServiceManagement
 import SwiftUI
 
 @main
-struct GrokBarApp: App {
+struct AgentStatusBarApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
@@ -26,7 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             fputs("launch-at-login: \(statusDescription(status))\n", stderr)
             if status == .requiresApproval {
                 fputs(
-                    "Allow GrokBar in System Settings → General → Login Items.\n",
+                    "Allow AgentStatusBar in System Settings → General → Login Items.\n",
                     stderr
                 )
             }

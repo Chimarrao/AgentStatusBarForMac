@@ -80,7 +80,7 @@ enum StatusFetcher {
             r.timeoutInterval = 8
             r.cachePolicy = .reloadIgnoringLocalCacheData
             r.setValue("application/rss+xml, application/xml, text/xml, */*", forHTTPHeaderField: "Accept")
-            r.setValue("grokbar/1.0", forHTTPHeaderField: "User-Agent")
+            r.setValue("agentstatusbar/1.0", forHTTPHeaderField: "User-Agent")
             return r
         }()
 

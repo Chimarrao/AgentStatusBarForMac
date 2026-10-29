@@ -2,9 +2,9 @@ import Foundation
 import ServiceManagement
 import os.log
 
-/// Best-effort Launch at Login via SMAppService. No UI — GrokBar always tries to stay registered.
+/// Best-effort Launch at Login via SMAppService. No UI — AgentStatusBar always tries to stay registered.
 enum LoginItemService {
-    private static let log = Logger(subsystem: "com.pixbroker.GrokBar", category: "LoginItem")
+    private static let log = Logger(subsystem: "local.agentstatusbar.mac", category: "LoginItem")
 
     static var status: SMAppService.Status {
         SMAppService.mainApp.status

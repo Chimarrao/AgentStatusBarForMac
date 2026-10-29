@@ -26,42 +26,52 @@ enum MenuBarRenderer {
 
         var clusters: [Cluster] = []
 
+        if model.showClaudeUsage, let snap = model.claudeSnapshot {
+            let text = poolText(snap.pools.map { ($0.percent, $0.resetsIn) }, attrs: attrs, dimAttrs: dimAttrs)
+            clusters.append(Cluster(icon: ProviderIcons.claude, primary: text, extra: []))
+        }
+
+        if model.showCodexUsage, let snap = model.codexSnapshot {
+            let text = poolText(snap.pools.map { ($0.percent, $0.resetsIn) }, attrs: attrs, dimAttrs: dimAttrs)
+            clusters.append(Cluster(icon: ProviderIcons.codex, primary: text, extra: []))
+        }
+
+        if model.showAntigravityUsage, let snap = model.antigravitySnapshot {
+            let text = poolText(snap.barPools.map { ($0.percent, $0.resetsIn) }, attrs: attrs, dimAttrs: dimAttrs)
+            clusters.append(Cluster(icon: ProviderIcons.antigravity, primary: text, extra: []))
+        }
+
         if model.showGrokUsage {
             let text: String
             switch model.state {
             case .loaded(let snap):
                 text = barText(percent: snap.usedPercent, resetsIn: snap.resetsIn)
             case .unavailable:
-                text = model.hasActiveOutage ? "⚠" : "—"
+                text = "-"
             case .failed:
                 text = model.hasActiveOutage ? "⚠" : "!"
             case .idle, .loading:
                 text = model.hasActiveOutage ? "⚠" : "…"
             }
-            clusters.append(Cluster(icon: ProviderIcons.grok, primary: NSAttributedString(string: text, attributes: attrs), extra: []))
+            if text != "-" {
+                clusters.append(Cluster(icon: ProviderIcons.grok, primary: NSAttributedString(string: text, attributes: attrs), extra: []))
+            }
         }
 
         if model.showGrokBotUsage {
             if let snap = model.grokBotSnapshot, let percent = snap.usedPercent, snap.hasAllowance {
                 let text = barText(percent: percent, resetsIn: snap.resetsIn)
                 clusters.append(Cluster(icon: ProviderIcons.grokBot, primary: NSAttributedString(string: text, attributes: attrs), extra: []))
-            } else if model.grokBotMessage != nil {
-                clusters.append(Cluster(icon: ProviderIcons.grokBot, primary: NSAttributedString(string: "—", attributes: attrs), extra: []))
             }
         }
 
-        if model.showCursorUsage {
-            if let snap = model.cursorSnapshot {
-                let auto = NSAttributedString(string: "\(Int(snap.cursorModelsPercent.rounded()))%", attributes: attrs)
-                let api = NSAttributedString(string: "\(Int(snap.otherModelsPercent.rounded()))%", attributes: attrs)
-                var extra = [api]
-                if let countdown = formatCountdown(snap.resetsIn, compact: true) {
-                    extra.append(NSAttributedString(string: countdown, attributes: dimAttrs))
-                }
-                clusters.append(Cluster(icon: ProviderIcons.cursor, primary: auto, extra: extra))
-            } else if model.cursorMessage != nil {
-                clusters.append(Cluster(icon: ProviderIcons.cursor, primary: NSAttributedString(string: "—", attributes: attrs), extra: []))
-            }
+        if model.showCursorUsage, let snap = model.cursorSnapshot {
+            let text = poolText(
+                [(snap.cursorModelsPercent, snap.resetsIn), (snap.otherModelsPercent, snap.resetsIn)],
+                attrs: attrs,
+                dimAttrs: dimAttrs
+            )
+            clusters.append(Cluster(icon: ProviderIcons.cursor, primary: text, extra: []))
         }
 
         if clusters.isEmpty {
@@ -90,7 +100,7 @@ enum MenuBarRenderer {
                 if i > 0 { x += clusterGap }
                 if let icon = cluster.icon {
                     let iconY = (barHeight - iconSide) / 2
-                    tinted(icon, color: color).draw(
+                    (icon.isTemplate ? tinted(icon, color: color) : icon).draw(
                         in: NSRect(x: x, y: iconY, width: iconSide, height: iconSide),
                         from: .zero,
                         operation: .sourceOver,
@@ -116,12 +126,22 @@ enum MenuBarRenderer {
         return image
     }
 
-    private static func barText(percent: Double, resetsIn: TimeInterval?) -> String {
-        let pct = "\(Int(percent.rounded()))%"
-        if let countdown = formatCountdown(resetsIn, compact: true) {
-            return "\(pct) \(countdown)"
+    /// "0% 4h | 40% 2d": each pool with its own reset, separated by a dim pipe.
+    private static func poolText(
+        _ pools: [(percent: Double, resetsIn: TimeInterval?)],
+        attrs: [NSAttributedString.Key: Any],
+        dimAttrs: [NSAttributedString.Key: Any]
+    ) -> NSAttributedString {
+        let out = NSMutableAttributedString()
+        for pool in pools {
+            if out.length > 0 { out.append(NSAttributedString(string: " | ", attributes: dimAttrs)) }
+            out.append(NSAttributedString(string: "\(Int(pool.percent.rounded()))%", attributes: attrs))
         }
-        return pct
+        return out
+    }
+
+    private static func barText(percent: Double, resetsIn: TimeInterval?) -> String {
+        "\(Int(percent.rounded()))%"
     }
 
     private static func menuBarTextColor() -> NSColor {

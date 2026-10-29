@@ -3,8 +3,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-APP_NAME="GrokBar"
-EXEC_NAME="GrokBar"
+APP_NAME="AgentStatusBarForMac"
+EXEC_NAME="AgentStatusBarForMac"
 BUILD_DIR="${ROOT}/build"
 APP_DIR="${BUILD_DIR}/${APP_NAME}.app"
 CONTENTS="${APP_DIR}/Contents"
@@ -37,12 +37,15 @@ SOURCES=(
   "$ROOT/Sources/LoginItemService.swift"
   "$ROOT/Sources/CursorAuthStore.swift"
   "$ROOT/Sources/CursorAPI.swift"
+  "$ROOT/Sources/ClaudeUsage.swift"
+  "$ROOT/Sources/CodexUsage.swift"
+  "$ROOT/Sources/AntigravityUsage.swift"
   "$ROOT/Sources/ProviderIcons.swift"
   "$ROOT/Sources/MenuBarRenderer.swift"
   "$ROOT/Sources/UsageViewModel.swift"
   "$ROOT/Sources/MenuContentView.swift"
   "$ROOT/Sources/StatusBarController.swift"
-  "$ROOT/Sources/GrokBarApp.swift"
+  "$ROOT/Sources/AgentStatusBarApp.swift"
 )
 
 echo "Compiling ${#SOURCES[@]} sources…"
@@ -50,7 +53,7 @@ echo "Compiling ${#SOURCES[@]} sources…"
   -parse-as-library \
   -O \
   -whole-module-optimization \
-  -target arm64-apple-macos14.0 \
+  -target "$(uname -m)-apple-macos14.0" \
   -sdk "$(xcrun --sdk macosx --show-sdk-path)" \
   -lsqlite3 \
   "${SOURCES[@]}" \
@@ -60,7 +63,9 @@ cp "$ROOT/Resources/Info.plist" "${CONTENTS}/Info.plist"
 # Menu bar template mark (official Grok logo) — 1x / 2x / 3x
 # App icon: AppIcon.icns (Dock / Finder) + AppIcon.png fallback
 for icon in GrokIcon.png "GrokIcon@2x.png" "GrokIcon@3x.png" GrokIcon.svg \
-            GrokBotIcon.svg CursorIcon.svg CursorIcon.png AppIcon.png AppIcon.icns; do
+            GrokBotIcon.svg ClaudeIcon.png "ClaudeIcon@2x.png" "ClaudeIcon@3x.png" \
+            CodexIcon.png "CodexIcon@2x.png" "CodexIcon@3x.png" \
+            AntigravityIcon.png "AntigravityIcon@2x.png" "AntigravityIcon@3x.png" CursorIcon.svg CursorIcon.png AppIcon.png AppIcon.icns; do
   if [[ -f "$ROOT/Resources/$icon" ]]; then
     cp "$ROOT/Resources/$icon" "${RES_DIR}/$icon"
   fi
