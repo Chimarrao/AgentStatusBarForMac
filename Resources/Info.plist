@@ -11,9 +11,9 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>AgentStatusBarForMac - Claude|Codex|Grok|Cursor</string>
+	<string>AgentStatusBarForMac - Claude|Codex|Antigravity|Grok|Cursor</string>
 	<key>CFBundleDisplayName</key>
-	<string>AgentStatusBarForMac - Claude|Codex|Grok|Cursor</string>
+	<string>AgentStatusBarForMac - Claude|Codex|Antigravity|Grok|Cursor</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleIconFile</key>
