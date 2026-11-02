@@ -9,10 +9,15 @@ struct AntigravityGroup: Equatable, Sendable, Codable {
 struct AntigravitySnapshot: Equatable, Sendable, Codable {
     var groups: [AntigravityGroup]
     var fetchedAt: Date
+    /// The group being consumed right now (see `AntigravityAPI.activeGroup`).
+    var activeGroup: String? = nil
 
-    /// Menu-bar view: for each window, the group that is closest to running out.
+    /// Menu bar: the group in use. Falls back to the most used pool per window when unknown.
     var barPools: [UsagePool] {
-        ["Session", "Weekly"].compactMap { label in
+        if let activeGroup, let group = groups.first(where: { $0.name == activeGroup }) {
+            return group.pools
+        }
+        return ["Session", "Weekly"].compactMap { label in
             groups.compactMap { $0.pools.first { $0.label == label } }
                 .max { $0.percent < $1.percent }
         }
@@ -60,9 +65,42 @@ enum AntigravityAPI {
 
         guard let exe = executable else { throw AntigravityError.notInstalled }
         let output = try await run(exe)
-        let snapshot = try parse(output)
+        var snapshot = try parse(output)
+        snapshot.activeGroup = activeGroup(in: snapshot, previous: cached)
         store(snapshot)
         return snapshot
+    }
+
+    private static let activeKey = "antigravityActiveGroup"
+
+    /// The CLI doesn't say which model is in use, so infer it from usage:
+    /// the group whose usage grew since the last read wins; a group that ran out
+    /// (any window at 100%) can't be the one being used; otherwise keep the last pick.
+    private static func activeGroup(in snapshot: AntigravitySnapshot, previous: AntigravitySnapshot?) -> String? {
+        let defaults = UserDefaults.standard
+        func used(_ group: AntigravityGroup) -> Double { group.pools.reduce(0) { $0 + $1.percent } }
+        func exhausted(_ group: AntigravityGroup) -> Bool { group.pools.contains { $0.percent >= 99.5 } }
+
+        var active = defaults.string(forKey: activeKey)
+
+        if let previous {
+            let grew = snapshot.groups.compactMap { group -> (String, Double)? in
+                guard let before = previous.groups.first(where: { $0.name == group.name }) else { return nil }
+                let delta = used(group) - used(before)
+                return delta > 0.01 ? (group.name, delta) : nil
+            }
+            if let top = grew.max(by: { $0.1 < $1.1 }) { active = top.0 }
+        }
+
+        let names = snapshot.groups.map(\.name)
+        let current = snapshot.groups.first { $0.name == active }
+        if current == nil || exhausted(current!) {
+            // Prefer a group that still has quota; among those, the least used.
+            let alive = snapshot.groups.filter { !exhausted($0) }
+            active = (alive.min { used($0) < used($1) } ?? snapshot.groups.min { used($0) < used($1) })?.name
+        }
+        if let active, names.contains(active) { defaults.set(active, forKey: activeKey) }
+        return active
     }
 
     private static func cachedSnapshot() -> AntigravitySnapshot? {

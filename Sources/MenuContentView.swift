@@ -304,9 +304,9 @@ struct MenuContentView: View {
             )
             ForEach(snap.groups, id: \.name) { group in
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(group.name)
+                    Text(group.name == snap.activeGroup ? "\(group.name) · in use" : group.name)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(group.name == snap.activeGroup ? Color.primary : Color.secondary)
                     ForEach(group.pools, id: \.label) { pool in
                         poolBlock(pool)
                     }
