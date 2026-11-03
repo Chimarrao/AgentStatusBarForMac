@@ -73,7 +73,7 @@ enum ClaudeError: LocalizedError {
         case .notSignedIn:
             return "Sign in to Claude Code (`claude`, then /login) so AgentStatusBar can read your usage."
         case .expired:
-            return "Claude sign-in expired. Open Claude Code once to refresh it."
+            return "Claude sign-in expired. Send any message in Claude Code (terminal) to refresh it."
         case .unauthorized:
             return "Claude rejected the session. Open Claude Code once to refresh it."
         case .httpStatus(let code):
@@ -99,55 +99,14 @@ enum ClaudeAuthStore {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/.credentials.json")
     }
 
+    /// Read-only on purpose: the access token lives ~8 h and only Claude Code renews it (when it makes a
+    /// request). Renewing it here would spend Claude Code's single-use refresh token and risk signing you out.
     static func load() throws -> Credential {
-        var credential = try loadStored()
-        if let expiresAt = credential.expiresAt, expiresAt.timeIntervalSinceNow < 120 {
-            // The access token only lives a few hours and Claude Code renews it when it runs,
-            // so ask the official CLI to do that instead of refreshing it ourselves.
-            refreshViaCLI()
-            credential = try loadStored()
-            if let expiresAt = credential.expiresAt, expiresAt <= Date() { throw ClaudeError.expired }
-        }
+        guard let data = keychainData() ?? (try? Data(contentsOf: credentialsFile)),
+              let credential = parse(data)
+        else { throw ClaudeError.notSignedIn }
+        if let expiresAt = credential.expiresAt, expiresAt <= Date() { throw ClaudeError.expired }
         return credential
-    }
-
-    private static func loadStored() throws -> Credential {
-        if let data = keychainData() ?? (try? Data(contentsOf: credentialsFile)),
-           let credential = parse(data)
-        {
-            return credential
-        }
-        throw ClaudeError.notSignedIn
-    }
-
-    private static let refreshLock = NSLock()
-    private nonisolated(unsafe) static var lastRefreshAttempt = Date.distantPast
-
-    static var claudeExecutable: String? {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return ["\(home)/.local/bin/claude", "/usr/local/bin/claude", "/opt/homebrew/bin/claude"]
-            .first { FileManager.default.isExecutableFile(atPath: $0) }
-    }
-
-    /// Runs `claude auth status`, which makes Claude Code renew its own stored sign-in.
-    /// At most once every 30 s, 20 s timeout.
-    static func refreshViaCLI() {
-        refreshLock.lock()
-        defer { refreshLock.unlock() }
-        guard Date().timeIntervalSince(lastRefreshAttempt) > 30, let path = claudeExecutable else { return }
-        lastRefreshAttempt = Date()
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: path)
-        process.arguments = ["auth", "status"]
-        process.currentDirectoryURL = FileManager.default.temporaryDirectory
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        guard (try? process.run()) != nil else { return }
-        let killer = DispatchWorkItem { if process.isRunning { process.terminate() } }
-        DispatchQueue.global().asyncAfter(deadline: .now() + 20, execute: killer)
-        process.waitUntilExit()
-        killer.cancel()
     }
 
     private static func parse(_ data: Data) -> Credential? {
@@ -229,14 +188,7 @@ enum ClaudeAPI {
             throw ClaudeError.rateLimited(until: backoff)
         }
         do {
-            let snapshot: ClaudeSnapshot
-            do {
-                snapshot = try await fetchRemote()
-            } catch ClaudeError.unauthorized {
-                // Token revoked or rotated under us: let Claude Code renew it, then try once more.
-                ClaudeAuthStore.refreshViaCLI()
-                snapshot = try await fetchRemote()
-            }
+            let snapshot = try await fetchRemote()
             if let data = try? JSONEncoder().encode(snapshot) { defaults.set(data, forKey: cacheKey) }
             defaults.removeObject(forKey: backoffKey)
             return snapshot
