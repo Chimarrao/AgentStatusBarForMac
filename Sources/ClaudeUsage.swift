@@ -11,9 +11,9 @@ struct UsagePool: Equatable, Sendable, Codable {
 
     static func label(forWindow seconds: Double) -> String {
         switch seconds {
-        case ..<(6 * 3_600): return "Session"
-        case ..<(8 * 86_400): return "Weekly"
-        default: return "Monthly"
+        case ..<(6 * 3_600): return tr("Session")
+        case ..<(8 * 86_400): return tr("Weekly")
+        default: return tr("Monthly")
         }
     }
 }
@@ -68,20 +68,21 @@ enum ClaudeError: LocalizedError {
         switch self {
         case .rateLimited(let until):
             let f = DateFormatter()
+            f.locale = L10n.language.locale
             f.timeStyle = .short
-            return "Claude is rate-limiting usage checks. Trying again at \(f.string(from: until))."
+            return tr("Claude is rate-limiting usage checks. Trying again at %@.", f.string(from: until))
         case .notSignedIn:
-            return "Sign in to Claude Code (`claude`, then /login) so AgentStatusBar can read your usage."
+            return tr("Sign in to Claude Code (`claude`, then /login) so AgentStatusBar can read your usage.")
         case .expired:
-            return "Claude sign-in expired. Send any message in Claude Code (terminal) to refresh it."
+            return tr("Claude sign-in expired. Send any message in Claude Code (terminal) to refresh it.")
         case .unauthorized:
-            return "Claude rejected the session. Open Claude Code once to refresh it."
+            return tr("Claude rejected the session. Open Claude Code once to refresh it.")
         case .httpStatus(let code):
-            return "Claude usage returned HTTP \(code)."
+            return tr("Claude usage returned HTTP %d.", code)
         case .badPayload:
-            return "Couldn’t parse Claude usage."
+            return tr("Couldn’t parse Claude usage.")
         case .transport:
-            return "Network error while loading Claude usage."
+            return tr("Network error while loading Claude usage.")
         }
     }
 }

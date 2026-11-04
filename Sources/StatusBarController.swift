@@ -112,6 +112,10 @@ final class StatusBarController: NSObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.updateButton() }
             .store(in: &cancellables)
+        model.$language
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateButton() }
+            .store(in: &cancellables)
         model.$showClaudeUsage
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.updateButton() }

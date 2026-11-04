@@ -17,15 +17,15 @@ enum CursorAuthError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingStateDB:
-            return "Cursor isn’t installed or signed in on this Mac."
+            return tr("Cursor isn’t installed or signed in on this Mac.")
         case .databaseOpenFailed:
-            return "Couldn’t read the Cursor session."
+            return tr("Couldn’t read the Cursor session.")
         case .missingAccessToken:
-            return "Sign in to Cursor, then try again."
+            return tr("Sign in to Cursor, then try again.")
         case .grokEmailMissing:
-            return "Sign in to Grok so Cursor usage can match the same account."
+            return tr("Sign in to Grok so Cursor usage can match the same account.")
         case .accountMismatch:
-            return "Cursor is signed in as a different account than Grok."
+            return tr("Cursor is signed in as a different account than Grok.")
         }
     }
 }

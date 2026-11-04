@@ -25,17 +25,23 @@ struct MenuContentView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 4) {
             if showingSettings {
                 Button {
                     showingSettings = false
                 } label: {
-                    Label("Settings", systemImage: "chevron.backward")
-                        .labelStyle(.titleAndIcon)
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(tr("Settings"))
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                    .padding(.horizontal, 6)
+                    .frame(height: 26)
                 }
-                .buttonStyle(.borderless)
-                .controlSize(.small)
-                .help("Back")
+                .buttonStyle(HeaderButtonStyle(width: nil))
+                .focusEffectDisabled()
+                .help(tr("Back"))
                 Spacer()
             } else {
                 Spacer()
@@ -44,22 +50,23 @@ struct MenuContentView: View {
                 } label: {
                     Image(systemName: "gearshape")
                 }
-                .buttonStyle(.borderless)
-                .help("Settings")
-                .accessibilityLabel("Settings")
+                .buttonStyle(HeaderButtonStyle())
+                .focusEffectDisabled()
+                .help(tr("Settings"))
+                .accessibilityLabel(tr("Settings"))
 
                 Button {
                     model.refresh()
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(HeaderButtonStyle())
+                .focusEffectDisabled()
                 .disabled(model.isRefreshing)
-                .help("Refresh")
-                .accessibilityLabel("Refresh")
+                .help(tr("Refresh"))
+                .accessibilityLabel(tr("Refresh"))
             }
         }
-        .foregroundStyle(.secondary)
     }
 
     @ViewBuilder
@@ -77,7 +84,7 @@ struct MenuContentView: View {
                 item.card
             }
             if cards.isEmpty {
-                Text("No signed-in agents found. Sign in to Claude Code, Codex, Grok or Cursor.")
+                Text(tr("No signed-in agents found. Sign in to Claude Code, Codex, Antigravity, Grok or Cursor."))
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -86,7 +93,7 @@ struct MenuContentView: View {
 
         Divider()
         HStack {
-            Button("Quit AgentStatusBar") {
+            Button(tr("Quit AgentStatusBar")) {
                 model.quit()
             }
             .buttonStyle(.borderless)
@@ -125,7 +132,7 @@ struct MenuContentView: View {
 
     private var settingsPage: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Show in Menu Bar")
+            Text(tr("Show in Menu Bar"))
                 .font(.headline)
             Toggle("Claude", isOn: $model.showClaudeUsage)
             Toggle("Codex", isOn: $model.showCodexUsage)
@@ -135,20 +142,33 @@ struct MenuContentView: View {
             Toggle("Cursor", isOn: $model.showCursorUsage)
             Divider()
             HStack {
-                Text("Refresh usage every")
+                Text(tr("Refresh usage every"))
                     .font(.callout)
                 Spacer()
                 Picker("", selection: $model.pollInterval) {
-                    Text("30 sec").tag(30.0)
-                    Text("1 min").tag(60.0)
-                    Text("5 min").tag(300.0)
-                    Text("10 min").tag(600.0)
+                    Text(tr("30 sec")).tag(30.0)
+                    Text(tr("1 min")).tag(60.0)
+                    Text(tr("5 min")).tag(300.0)
+                    Text(tr("10 min")).tag(600.0)
                 }
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .fixedSize()
             }
-            Text("Grok Bot and Cursor use your Cursor session when it matches the Grok account.")
+            HStack {
+                Text(tr("Language"))
+                    .font(.callout)
+                Spacer()
+                Picker("", selection: $model.language) {
+                    ForEach(AppLanguage.allCases) { language in
+                        Text(language.nativeName).tag(language)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize()
+            }
+            Text(tr("Grok Bot and Cursor use your Cursor session when it matches the Grok account."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -188,7 +208,7 @@ struct MenuContentView: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
-                Text("Loading Claude…")
+                Text(tr("Loading %@…", "Claude"))
                     .foregroundStyle(.secondary)
             }
         }
@@ -200,19 +220,33 @@ struct MenuContentView: View {
     private func creditsBlock(_ rows: [CreditRow]) -> some View {
         if !rows.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Extra credits")
+                Text(tr("Extra credits"))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 ForEach(rows, id: \.label) { row in
                     HStack {
-                        Text(row.label)
+                        Text(tr(row.label))
                             .font(.callout)
                         Spacer(minLength: 8)
-                        Text(row.value)
+                        Text(tr(row.value))
                             .font(.callout.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func resetsBlock(available: Int, usable: Int) -> some View {
+        if available > 0 {
+            HStack {
+                Text(tr("Available resets"))
+                    .font(.callout)
+                Spacer(minLength: 8)
+                Text(tr("%1$d · %2$d usable now", available, usable))
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -225,7 +259,7 @@ struct MenuContentView: View {
     private func staleNote(_ fetchedAt: Date, _ message: String?) -> some View {
         Group {
             if let message, !message.isEmpty {
-                Text("Showing last update from \(fetchedAt.formatted(date: .omitted, time: .shortened)). \(message)")
+                Text(tr("Showing last update from %1$@. %2$@", fetchedAt.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(L10n.language.locale)), message))
                     .font(.caption)
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
@@ -236,23 +270,12 @@ struct MenuContentView: View {
     private func poolBlock(_ pool: UsagePool) -> some View {
         let start = pool.resetsAt.map { $0.addingTimeInterval(-pool.windowSeconds) }
         return usageBlock(
-            usedLabel: "\(pool.label) · \(Int(pool.percent.rounded()))% used",
+            usedLabel: tr("%1$@ · %2$d%% used", tr(pool.label), Int(pool.percent.rounded())),
             reset: pool.resetsAt,
             usedFraction: pool.percent / 100,
             pace: expectedPace(start: start, end: pool.resetsAt, fallbackDays: pool.windowSeconds / 86_400),
             dayCount: pool.label == "Weekly" ? 7 : 0
         )
-    }
-
-    private func claudeSubRow(_ name: String, _ percent: Double) -> some View {
-        HStack {
-            Text("\(name) weekly")
-                .font(.callout)
-            Spacer(minLength: 8)
-            Text("\(Int(percent.rounded()))%")
-                .font(.callout.monospacedDigit())
-                .foregroundStyle(.secondary)
-        }
     }
 
     @ViewBuilder
@@ -269,6 +292,7 @@ struct MenuContentView: View {
                 poolBlock(pool)
             }
             creditsBlock(snap.creditRows)
+            resetsBlock(available: snap.resetCredits, usable: snap.resetCreditsUsable)
             staleNote(snap.fetchedAt, model.codexMessage)
         } else if let message = model.codexMessage {
             providerHeader(
@@ -286,7 +310,7 @@ struct MenuContentView: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
-                Text("Loading Codex…")
+                Text(tr("Loading %@…", "Codex"))
                     .foregroundStyle(.secondary)
             }
         }
@@ -304,7 +328,7 @@ struct MenuContentView: View {
             )
             ForEach(snap.groups, id: \.name) { group in
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(group.name == snap.activeGroup ? "\(group.name) · in use" : group.name)
+                    Text(group.name == snap.activeGroup ? tr("%@ · in use", tr(group.name)) : tr(group.name))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(group.name == snap.activeGroup ? Color.primary : Color.secondary)
                     ForEach(group.pools, id: \.label) { pool in
@@ -340,7 +364,7 @@ struct MenuContentView: View {
                 identityOpen: $grokIdentityOpen
             )
             usageBlock(
-                usedLabel: "\(Int(snap.usedPercent.rounded()))% of weekly limit used",
+                usedLabel: tr("%d%% of weekly limit used", Int(snap.usedPercent.rounded())),
                 reset: snap.periodEnd,
                 usedFraction: snap.usedPercent / 100,
                 pace: expectedPace(start: snap.periodStart, end: snap.periodEnd, fallbackDays: 7),
@@ -380,7 +404,7 @@ struct MenuContentView: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
-                Text("Loading SuperGrok…")
+                Text(tr("Loading %@…", "SuperGrok"))
                     .foregroundStyle(.secondary)
             }
         }
@@ -398,7 +422,7 @@ struct MenuContentView: View {
             )
             if let percent = snap.usedPercent, snap.hasAllowance {
                 usageBlock(
-                    usedLabel: "\(Int(percent.rounded()))% of weekly limit used",
+                    usedLabel: tr("%d%% of weekly limit used", Int(percent.rounded())),
                     reset: snap.periodEnd,
                     usedFraction: percent / 100,
                     pace: expectedPace(start: snap.periodStart, end: snap.periodEnd, fallbackDays: 7),
@@ -427,7 +451,7 @@ struct MenuContentView: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
-                Text("Loading Grok Bot…")
+                Text(tr("Loading %@…", "Grok Bot"))
                     .foregroundStyle(.secondary)
             }
         }
@@ -474,7 +498,7 @@ struct MenuContentView: View {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
-                Text("Loading Cursor…")
+                Text(tr("Loading %@…", "Cursor"))
                     .foregroundStyle(.secondary)
             }
         }
@@ -505,7 +529,7 @@ struct MenuContentView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.plain)
-                .help("Show account")
+                .help(tr("Show account"))
             }
             if identityOpen.wrappedValue {
                 if let name, !name.isEmpty, name != email {
@@ -536,7 +560,7 @@ struct MenuContentView: View {
                     .font(.callout)
                 Spacer(minLength: 8)
                 if let reset {
-                    Text("Resets \(Formatters.resetDateTime.string(from: reset))")
+                    Text(tr("Resets %@", Formatters.resetDateTime.string(from: reset)))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.trailing)
@@ -565,12 +589,12 @@ struct MenuContentView: View {
         let used = percent / 100
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
-                Text("\(title) · \(Int(percent.rounded()))% of monthly limit used")
+                Text(tr("%1$@ · %2$d%% of monthly limit used", tr(title), Int(percent.rounded())))
                     .font(.callout)
                     .lineLimit(2)
                 Spacer(minLength: 8)
                 if showReset, let reset {
-                    Text("Resets \(Formatters.resetDateTime.string(from: reset))")
+                    Text(tr("Resets %@", Formatters.resetDateTime.string(from: reset)))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -589,7 +613,7 @@ struct MenuContentView: View {
 
     private var outageBanner: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("xAI status issue")
+            Text(tr("xAI status issue"))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.orange)
             if let headline = model.serviceStatus?.headline {
@@ -598,7 +622,7 @@ struct MenuContentView: View {
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Button("Open status.x.ai") {
+            Button(tr("Open status.x.ai")) {
                 model.openStatusPage()
             }
             .buttonStyle(.plain)
@@ -641,5 +665,36 @@ private struct UsageMeter: View {
         }
         .frame(height: 8)
         .accessibilityHidden(true)
+    }
+}
+
+/// Quiet toolbar button: secondary glyph, soft rounded hover/press background, no focus ring.
+private struct HeaderButtonStyle: ButtonStyle {
+    var width: CGFloat? = 26
+
+    func makeBody(configuration: Configuration) -> some View {
+        HeaderButton(configuration: configuration, width: width)
+    }
+
+    private struct HeaderButton: View {
+        let configuration: ButtonStyle.Configuration
+        let width: CGFloat?
+        @State private var hovering = false
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            configuration.label
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(hovering || configuration.isPressed ? Color.primary : Color.secondary)
+                .frame(width: width, height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color.primary.opacity(configuration.isPressed ? 0.16 : (hovering ? 0.09 : 0)))
+                )
+                .opacity(isEnabled ? 1 : 0.4)
+                .contentShape(Rectangle())
+                .onHover { hovering = $0 }
+                .animation(.easeOut(duration: 0.12), value: hovering)
+        }
     }
 }

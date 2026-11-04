@@ -30,6 +30,8 @@ mkdir -p "$MACOS_DIR" "$RES_DIR"
 
 SOURCES=(
   "$ROOT/Sources/Models.swift"
+  "$ROOT/Sources/L10n.swift"
+  "$ROOT/Sources/Translations.swift"
   "$ROOT/Sources/AuthStore.swift"
   "$ROOT/Sources/UsageFetcher.swift"
   "$ROOT/Sources/UsageCache.swift"

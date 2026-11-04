@@ -58,6 +58,16 @@ final class UsageViewModel: ObservableObject {
         }
     }
 
+    /// UI language. Changing it re-renders the panel at once and re-reads usage so
+    /// any message built from an earlier error comes back in the new language.
+    @Published var language: AppLanguage {
+        didSet {
+            UserDefaults.standard.set(language.rawValue, forKey: PrefKey.language)
+            L10n.language = language
+            if didStart { refresh(force: true) }
+        }
+    }
+
     @Published var showAntigravityUsage: Bool {
         didSet {
             UserDefaults.standard.set(showAntigravityUsage, forKey: PrefKey.showAntigravity)
@@ -92,6 +102,7 @@ final class UsageViewModel: ObservableObject {
         static let pollInterval = "pollIntervalSeconds"
         static let showCodex = "showCodexUsage"
         static let showAntigravity = "showAntigravityUsage"
+        static let language = "appLanguage"
         static let showClaude = "showClaudeUsage"
         static let showGrok = "showGrokUsage"
         static let showBot = "showGrokBotUsage"
@@ -119,6 +130,9 @@ final class UsageViewModel: ObservableObject {
         pollInterval = [30, 60, 300, 600].contains(savedInterval) ? savedInterval : 300
         showCodexUsage = defaults.object(forKey: PrefKey.showCodex) as? Bool ?? true
         showAntigravityUsage = defaults.object(forKey: PrefKey.showAntigravity) as? Bool ?? true
+        let savedLanguage = AppLanguage(rawValue: defaults.string(forKey: PrefKey.language) ?? "") ?? .en
+        language = savedLanguage
+        L10n.language = savedLanguage
         claudeSnapshot = ClaudeAPI.cachedSnapshot()
         showClaudeUsage = defaults.object(forKey: PrefKey.showClaude) as? Bool ?? true
     }
@@ -190,30 +204,41 @@ final class UsageViewModel: ObservableObject {
         return joined
     }
 
+    private func poolSummary(_ name: String, _ pool: UsagePool) -> String {
+        let label = "\(name) \(tr(pool.label).lowercased())"
+        let percent = Int(pool.percent.rounded())
+        if let reset = formatCountdown(pool.resetsIn) {
+            return tr("%1$@ %2$d%% used, resets in %3$@", label, percent, reset)
+        }
+        return tr("%1$@ %2$d%% used", label, percent)
+    }
+
     var menuBarAccessibilityLabel: String {
         _ = clockTick
         var parts: [String] = []
         if let status = serviceStatus, status.hasActiveIncident {
-            parts.append("xAI status issue: \(status.headline)")
+            parts.append(tr("xAI status issue: %@", status.headline))
+        }
+        if showClaudeUsage {
+            if let snap = claudeSnapshot {
+                parts.append(snap.pools.map { poolSummary("Claude", $0) }.joined(separator: ". "))
+            } else if let claudeMessage {
+                parts.append("Claude: \(claudeMessage)")
+            }
         }
         if showCodexUsage {
             if let snap = codexSnapshot {
-                let text = snap.pools.map { pool -> String in
-                    var t = "Codex \(pool.label.lowercased()) \(Int(pool.percent.rounded()))% used"
-                    if let reset = formatCountdown(pool.resetsIn) { t += ", resets in \(reset)" }
-                    return t
-                }
-                parts.append(text.joined(separator: ". "))
+                parts.append(snap.pools.map { poolSummary("Codex", $0) }.joined(separator: ". "))
             } else if let codexMessage {
                 parts.append("Codex: \(codexMessage)")
             }
         }
         if showAntigravityUsage {
             if let snap = antigravitySnapshot {
-                let text = snap.groups.map { group in
-                    group.name + ": " + group.pools.map { "\($0.label.lowercased()) \(Int($0.percent.rounded()))% used" }.joined(separator: ", ")
+                let groups = snap.groups.map { group in
+                    group.pools.map { poolSummary("Antigravity \(tr(group.name))", $0) }.joined(separator: ", ")
                 }
-                parts.append("Antigravity " + text.joined(separator: "; "))
+                parts.append(groups.joined(separator: "; "))
             } else if let antigravityMessage {
                 parts.append("Antigravity: \(antigravityMessage)")
             }
@@ -221,50 +246,35 @@ final class UsageViewModel: ObservableObject {
         if showGrokUsage {
             switch state {
             case .loaded(let snap):
-                let reset = formatCountdown(snap.resetsIn) ?? "unknown"
-                parts.append(
-                    "Grok \(Int(snap.usedPercent.rounded()))% used, \(snap.cycleLabel.lowercased()) pool, resets in \(reset)"
-                )
+                let reset = formatCountdown(snap.resetsIn) ?? tr("unknown")
+                parts.append(tr("%1$@ %2$d%% used, resets in %3$@", "Grok \(tr(snap.cycleLabel).lowercased())", Int(snap.usedPercent.rounded()), reset))
             case .unavailable(let title, let hint):
                 parts.append("Grok: \(title). \(hint)")
             case .failed(let message):
-                parts.append("Grok usage error: \(message)")
+                parts.append("Grok: \(message)")
             default:
                 break
             }
         }
         if showGrokBotUsage {
             if let snap = grokBotSnapshot, let percent = snap.usedPercent {
-                let reset = formatCountdown(snap.resetsIn) ?? "unknown"
-                parts.append("Grok Bot \(Int(percent.rounded()))% used, weekly pool, resets in \(reset)")
+                let reset = formatCountdown(snap.resetsIn) ?? tr("unknown")
+                parts.append(tr("%1$@ %2$d%% used, resets in %3$@", "Grok Bot \(tr("Weekly").lowercased())", Int(percent.rounded()), reset))
             } else if let grokBotMessage {
                 parts.append("Grok Bot: \(grokBotMessage)")
             }
         }
         if showCursorUsage {
             if let snap = cursorSnapshot {
-                let reset = formatCountdown(snap.resetsIn) ?? "unknown"
-                parts.append(
-                    "Cursor Models \(Int(snap.cursorModelsPercent.rounded()))%, Other Models \(Int(snap.otherModelsPercent.rounded()))%, resets in \(reset)"
-                )
+                let reset = formatCountdown(snap.resetsIn) ?? tr("unknown")
+                parts.append(tr("%1$@ %2$d%% used, resets in %3$@", tr("Cursor Models"), Int(snap.cursorModelsPercent.rounded()), reset))
+                parts.append(tr("%1$@ %2$d%% used", tr("Other Models"), Int(snap.otherModelsPercent.rounded())))
             } else if let cursorMessage {
                 parts.append("Cursor: \(cursorMessage)")
             }
         }
-        if showClaudeUsage {
-            if let snap = claudeSnapshot {
-                let text = snap.pools.map { pool -> String in
-                    var t = "Claude \(pool.label.lowercased()) \(Int(pool.percent.rounded()))% used"
-                    if let reset = formatCountdown(pool.resetsIn) { t += ", resets in \(reset)" }
-                    return t
-                }
-                parts.append(text.joined(separator: ". "))
-            } else if let claudeMessage {
-                parts.append("Claude: \(claudeMessage)")
-            }
-        }
         if parts.isEmpty {
-            parts.append("AgentStatusBar. Open to choose what to show.")
+            parts.append(tr("AgentStatusBar. Open to choose what to show."))
         }
         return parts.joined(separator: ". ")
     }
@@ -541,7 +551,7 @@ final class UsageViewModel: ObservableObject {
     private func classify(_ error: Error, outage: ServiceStatusSnapshot?) -> ClassifiedError {
         let outageHint: String? = {
             guard let outage, outage.hasActiveIncident else { return nil }
-            return "xAI status: \(outage.headline). See status.x.ai"
+            return tr("xAI status: %@. See status.x.ai", outage.headline)
         }()
 
         if let auth = error as? AuthStoreError {
@@ -551,7 +561,7 @@ final class UsageViewModel: ObservableObject {
             }
             return ClassifiedError(
                 kind: auth.isSetupIssue ? .setup : .transient,
-                menuMessage: auth.errorDescription ?? "Not signed in to Grok.",
+                menuMessage: auth.errorDescription ?? tr("Not signed in to Grok."),
                 hint: hint
             )
         }
@@ -559,29 +569,29 @@ final class UsageViewModel: ObservableObject {
             if fetch.isAuthIssue {
                 return ClassifiedError(
                     kind: .setup,
-                    menuMessage: "Grok session expired.",
-                    hint: "Run `grok login` again. AgentStatusBar will recover on the next check."
+                    menuMessage: tr("Grok session expired."),
+                    hint: tr("Run `grok login` again. AgentStatusBar will recover on the next check.")
                 )
             }
             if fetch.isTransient {
                 return ClassifiedError(
                     kind: .transient,
                     menuMessage: outageHint != nil
-                        ? "Usage unreachable (possible outage)."
-                        : (fetch.errorDescription ?? "Network error."),
-                    hint: outageHint ?? "Will retry automatically."
+                        ? tr("Usage unreachable (possible outage).")
+                        : (fetch.errorDescription ?? tr("Network error.")),
+                    hint: outageHint ?? tr("Will retry automatically.")
                 )
             }
             return ClassifiedError(
                 kind: .hard,
-                menuMessage: fetch.errorDescription ?? "Couldn’t load usage.",
-                hint: outageHint ?? "Will retry automatically."
+                menuMessage: fetch.errorDescription ?? tr("Couldn’t load usage."),
+                hint: outageHint ?? tr("Will retry automatically.")
             )
         }
         return ClassifiedError(
             kind: .transient,
             menuMessage: error.localizedDescription,
-            hint: outageHint ?? "Will retry automatically."
+            hint: outageHint ?? tr("Will retry automatically.")
         )
     }
 

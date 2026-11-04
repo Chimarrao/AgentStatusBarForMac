@@ -22,14 +22,18 @@ Providers you are not signed in to are hidden, in the menu bar and in the popove
 | Provider | Shows | Reads from |
 |----------|-------|-----------|
 | **Claude** | Session (5h), Weekly, usage credits spent | Claude Code sign-in (macOS Keychain item `Claude Code-credentials`, or `~/.claude/.credentials.json`) |
-| **Codex** | Session / Weekly / Monthly (whatever your plan has), credits | `~/.codex/auth.json` (or `$CODEX_HOME`) |
-| **Antigravity** | 5h + weekly for *Gemini* and *Claude & GPT* model groups | the official `agy -p /usage` (Antigravity CLI), no credentials touched |
+| **Codex** | Session / Weekly / Monthly (whatever your plan has), credits, available limit resets | `~/.codex/auth.json` (or `$CODEX_HOME`) |
+| **Antigravity** | 5h + weekly for *Gemini* and *Claude & GPT* model groups; the menu bar follows the group you are using | the official `agy -p /usage` (Antigravity CLI), no credentials touched |
 | **Grok** | SuperGrok weekly pool, per-product split, prepaid balance | `~/.grok/auth.json` |
 | **Cursor** | Cursor Models / Other Models monthly pools, Grok Bot | Cursor's local session |
 
 Usage credits / prepaid balances are listed only when the account actually has them.
 
-Settings (gear icon): toggle each provider, and choose how often to read usage (30 s, 1, 5 or 10 min). If a read fails, the last good numbers stay on screen with a note.
+Settings (gear icon): toggle each provider, choose how often to read usage (30 s, 1, 5 or 10 min) and pick the **language**. If a read fails, the last good numbers stay on screen with a note.
+
+**Languages** (switch live, English is the default): English, Português, Español, Français, Deutsch, Русский, 中文, 日本語, हिन्दी and Bahasa Indonesia. Strings live in [`Sources/Translations.swift`](Sources/Translations.swift), keyed by the English text; a missing translation falls back to English.
+
+**Available resets:** when the API reports limit-reset credits (Codex does), the card shows how many you hold and how many can be used right now. Claude does not expose any reset field today, so nothing is shown for it.
 
 ## Requirements
 
@@ -57,6 +61,8 @@ Compared with the original GrokBar:
 - Cleaner usage bars (no pace marker or day ticks); blue, turning orange at 80% and red at 95%.
 - Extra-credits section (Claude, Codex, Grok) when present.
 - Configurable refresh interval; last good value kept on errors.
+- 10 UI languages, switchable live from Settings.
+- Codex available limit resets; quieter toolbar icons.
 - Builds natively on Intel Macs (the original build script hard-coded `arm64`).
 - Renamed to AgentStatusBarForMac.
 

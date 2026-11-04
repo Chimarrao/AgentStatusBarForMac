@@ -23,17 +23,17 @@ enum AuthStoreError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingGrokHome:
-            return "Grok isn’t set up on this Mac yet."
+            return tr("Grok isn’t set up on this Mac yet.")
         case .missingAuthFile:
-            return "Not signed in to Grok."
+            return tr("Not signed in to Grok.")
         case .invalidAuthJSON:
-            return "Grok login data is unreadable."
+            return tr("Grok login data is unreadable.")
         case .noAccessToken:
-            return "Not signed in to Grok."
+            return tr("Not signed in to Grok.")
         case .noRefreshToken, .sessionExpired:
-            return "Grok session expired."
+            return tr("Grok session expired.")
         case .refreshFailed:
-            return "Couldn’t refresh Grok session."
+            return tr("Couldn’t refresh Grok session.")
         }
     }
 
@@ -41,13 +41,13 @@ enum AuthStoreError: LocalizedError {
     var recoveryHint: String {
         switch self {
         case .missingGrokHome:
-            return "Install Grok Build, run `grok login`, then AgentStatusBar will pick it up."
+            return tr("Install Grok Build, run `grok login`, then AgentStatusBar will pick it up.")
         case .missingAuthFile, .noAccessToken:
-            return "Run `grok login` in a terminal. AgentStatusBar watches for sign-in automatically."
+            return tr("Run `grok login` in a terminal. AgentStatusBar watches for sign-in automatically.")
         case .invalidAuthJSON:
-            return "Run `grok login` again to recreate the auth file."
+            return tr("Run `grok login` again to recreate the auth file.")
         case .noRefreshToken, .sessionExpired:
-            return "Run `grok login` again to renew the session."
+            return tr("Run `grok login` again to renew the session.")
         case .refreshFailed(let detail):
             return detail
         }

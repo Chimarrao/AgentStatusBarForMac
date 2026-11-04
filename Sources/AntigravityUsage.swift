@@ -33,13 +33,13 @@ enum AntigravityError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notInstalled:
-            return "Antigravity CLI (`agy`) isn’t installed."
+            return tr("Antigravity CLI (`agy`) isn’t installed.")
         case .failed(let detail):
-            return detail.isEmpty ? "Antigravity CLI couldn’t read usage. Run `agy` once and sign in." : detail
+            return detail.isEmpty ? tr("Antigravity CLI couldn’t read usage. Run `agy` once and sign in.") : detail
         case .timedOut:
-            return "Antigravity CLI took too long to answer."
+            return tr("Antigravity CLI took too long to answer.")
         case .badPayload:
-            return "Couldn’t parse Antigravity usage."
+            return tr("Couldn’t parse Antigravity usage.")
         }
     }
 }

@@ -5,6 +5,9 @@ struct CodexSnapshot: Equatable, Sendable {
     var planName: String
     var fetchedAt: Date
     var creditRows: [CreditRow] = []
+    /// "Rate limit reset" credits the account holds, and how many can be used right now.
+    var resetCredits = 0
+    var resetCreditsUsable = 0
 }
 
 enum CodexError: LocalizedError {
@@ -18,17 +21,17 @@ enum CodexError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notSignedIn:
-            return "Sign in with Codex (`codex login`) so AgentStatusBar can read your usage."
+            return tr("Sign in with Codex (`codex login`) so AgentStatusBar can read your usage.")
         case .expired:
-            return "Codex sign-in expired. Run `codex` once to refresh it."
+            return tr("Codex sign-in expired. Run `codex` once to refresh it.")
         case .unauthorized:
-            return "ChatGPT rejected the session. Run `codex` once to refresh it."
+            return tr("ChatGPT rejected the session. Run `codex` once to refresh it.")
         case .httpStatus(let code):
-            return "Codex usage returned HTTP \(code)."
+            return tr("Codex usage returned HTTP %d.", code)
         case .badPayload:
-            return "Couldn’t parse Codex usage."
+            return tr("Couldn’t parse Codex usage.")
         case .transport:
-            return "Network error while loading Codex usage."
+            return tr("Network error while loading Codex usage.")
         }
     }
 }
@@ -121,7 +124,9 @@ enum CodexAPI {
             pools: pools,
             planName: planName(root["plan_type"] as? String),
             fetchedAt: Date(),
-            creditRows: creditRows(root["credits"])
+            creditRows: creditRows(root["credits"]),
+            resetCredits: ((root["rate_limit_reset_credits"] as? [String: Any])?["available_count"] as? NSNumber)?.intValue ?? 0,
+            resetCreditsUsable: ((root["rate_limit_reset_credits"] as? [String: Any])?["applicable_available_count"] as? NSNumber)?.intValue ?? 0
         )
     }
 

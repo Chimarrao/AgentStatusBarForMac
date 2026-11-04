@@ -9,13 +9,13 @@ enum CursorAPIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unauthorized:
-            return "Cursor session expired. Sign in to Cursor again."
+            return tr("Cursor session expired. Sign in to Cursor again.")
         case .httpStatus(let code):
-            return "Cursor usage returned HTTP \(code)."
+            return tr("Cursor usage returned HTTP %d.", code)
         case .badPayload:
-            return "Couldn’t parse Cursor usage."
+            return tr("Couldn’t parse Cursor usage.")
         case .transport:
-            return "Network error while loading Cursor usage."
+            return tr("Network error while loading Cursor usage.")
         }
     }
 }
@@ -80,7 +80,7 @@ enum CursorAPI {
                 planLabel: label,
                 accountName: name,
                 accountEmail: email,
-                statusMessage: "This Cursor account has no included Grok Bot weekly pool.",
+                statusMessage: tr("This Cursor account has no included Grok Bot weekly pool."),
                 hasAllowance: false,
                 fetchedAt: Date()
             )
@@ -93,7 +93,7 @@ enum CursorAPI {
             planLabel: label,
             accountName: name,
             accountEmail: email,
-            statusMessage: percent == nil ? "Grok Bot usage response did not include a percentage." : nil,
+            statusMessage: percent == nil ? tr("Grok Bot usage response did not include a percentage.") : nil,
             hasAllowance: percent != nil,
             fetchedAt: Date()
         )

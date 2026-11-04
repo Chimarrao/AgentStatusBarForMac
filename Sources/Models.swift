@@ -94,7 +94,7 @@ struct UsageSnapshot: Equatable, Sendable {
             return planDisplayName
         }
         if let name = SubscriptionCatalog.name(forTier: subscriptionTier, monthlyLimitCents: monthlyLimitCents) {
-            return name
+            return name == "Free" ? tr("Free") : name
         }
         if isUnifiedBilling {
             return "SuperGrok (unified)"
@@ -194,14 +194,14 @@ enum Formatters {
     /// Reset date + time without year, e.g. "Aug 13, 3:46 PM".
     static var resetDateTime: DateFormatter {
         let f = DateFormatter()
-        f.locale = .current
+        f.locale = L10n.language.locale
         f.setLocalizedDateFormatFromTemplate("MMMd jm")
         return f
     }
 
     static var currency: NumberFormatter {
         let f = NumberFormatter()
-        f.locale = .current
+        f.locale = L10n.language.locale
         f.numberStyle = .currency
         f.currencyCode = "USD"
         f.maximumFractionDigits = 2
@@ -225,7 +225,7 @@ func expectedPace(start: Date?, end: Date?, fallbackDays: Double) -> Double? {
 func formatCountdown(_ interval: TimeInterval?, compact: Bool = false) -> String? {
     guard let interval else { return nil }
     if interval <= 0 {
-        return compact ? "now" : "Resets soon"
+        return compact ? "now" : tr("Resets soon")
     }
 
     let total = Int(interval.rounded())
@@ -244,19 +244,15 @@ func formatCountdown(_ interval: TimeInterval?, compact: Bool = false) -> String
         return "\(max(minutes, 1))m"
     }
 
-    // Detail panel: always include days and hours when a full day or more remains.
-    if days >= 1 {
-        let dayPart = "\(days) day\(days == 1 ? "" : "s")"
-        let hourPart = "\(hours) hour\(hours == 1 ? "" : "s")"
-        return "\(dayPart), \(hourPart)"
-    }
-    if hours >= 1 {
-        if minutes > 0 {
-            return "\(hours) hour\(hours == 1 ? "" : "s"), \(minutes) min"
-        }
-        return "\(hours) hour\(hours == 1 ? "" : "s")"
-    }
-    return "\(max(minutes, 1)) min"
+    // Detail panel: localized units ("4 days, 19 hours"), two largest units.
+    let formatter = DateComponentsFormatter()
+    formatter.unitsStyle = .full
+    formatter.maximumUnitCount = 2
+    formatter.allowedUnits = days >= 1 ? [.day, .hour] : (hours >= 1 ? [.hour, .minute] : [.minute])
+    var calendar = Calendar.current
+    calendar.locale = L10n.language.locale
+    formatter.calendar = calendar
+    return formatter.string(from: max(interval, 60))
 }
 
 func formatUSD(cents: Int) -> String {
