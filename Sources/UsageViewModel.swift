@@ -102,7 +102,8 @@ final class UsageViewModel: ObservableObject {
             } catch {
                 guard let self else { return }
                 self.claudeConnecting = false
-                self.claudeConnectError = tr("That code didn’t work. Click Connect Claude and try again.")
+                self.claudeConnectError = (error as? ClaudeError)?.errorDescription
+                    ?? tr("That code didn’t work. Click Connect Claude and try again.")
             }
         }
     }

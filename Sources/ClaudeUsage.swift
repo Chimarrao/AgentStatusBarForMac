@@ -64,9 +64,12 @@ enum ClaudeError: LocalizedError {
     case transport
     case rateLimited(until: Date)
     case connectFailed
+    case connectDetail(String)
 
     var errorDescription: String? {
         switch self {
+        case .connectDetail(let detail):
+            return tr("That code didn’t work. Click Connect Claude and try again.") + " (\(detail))"
         case .connectFailed:
             return tr("Couldn’t connect to Claude. Try again.")
         case .rateLimited(let until):
