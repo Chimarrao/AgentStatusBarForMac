@@ -3,13 +3,19 @@ import SwiftUI
 
 struct MenuContentView: View {
     @ObservedObject var model: UsageViewModel
-    @State private var showingSettings = false
+    @State private var showingSettings: Bool
     @State private var grokIdentityOpen = false
     @State private var grokBotIdentityOpen = false
     @State private var cursorIdentityOpen = false
     @State private var claudeIdentityOpen = false
     @State private var codexIdentityOpen = false
     @State private var antigravityIdentityOpen = false
+
+    init(model: UsageViewModel) {
+        self.model = model
+        // Coming back from the browser mid-connect should land on the code field.
+        _showingSettings = State(initialValue: model.claudeConnectPending != nil)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -141,6 +147,8 @@ struct MenuContentView: View {
             Toggle("Grok Bot", isOn: $model.showGrokBotUsage)
             Toggle("Cursor", isOn: $model.showCursorUsage)
             Divider()
+            claudeConnectionSection
+            Divider()
             HStack {
                 Text(tr("Refresh usage every"))
                     .font(.callout)
@@ -178,6 +186,47 @@ struct MenuContentView: View {
     }
 
     @ViewBuilder
+    private var claudeConnectionSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(tr("Claude connection"))
+                .font(.headline)
+            if model.claudeConnected {
+                Text(tr("Connected. Renews itself, no tokens used."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button(tr("Disconnect")) { model.disconnectClaude() }
+                    .controlSize(.small)
+            } else {
+                Text(tr("Not connected. Using Claude Code’s sign-in, which expires every few hours."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button(tr("Connect Claude")) { model.beginClaudeConnect() }
+                    .controlSize(.small)
+                if model.claudeConnectPending != nil {
+                    Text(tr("After authorizing in the browser, paste the code here:"))
+                        .font(.caption)
+                    HStack {
+                        TextField("", text: $model.claudeConnectCode)
+                            .textFieldStyle(.roundedBorder)
+                            .controlSize(.small)
+                        Button(tr("Finish")) { model.finishClaudeConnect() }
+                            .controlSize(.small)
+                            .disabled(model.claudeConnectCode.isEmpty || model.claudeConnecting)
+                    }
+                    if let error = model.claudeConnectError {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
     private var claudeCard: some View {
         if let snap = model.claudeSnapshot {
             providerHeader(
@@ -192,6 +241,11 @@ struct MenuContentView: View {
             }
             creditsBlock(snap.creditRows)
             staleNote(snap.fetchedAt, model.claudeMessage)
+            if model.claudeMessage != nil, !model.claudeConnected {
+                Button(tr("Fix permanently…")) { showingSettings = true }
+                    .buttonStyle(.link)
+                    .font(.caption)
+            }
         } else if let message = model.claudeMessage {
             providerHeader(
                 icon: ProviderIcons.claude,
@@ -204,6 +258,11 @@ struct MenuContentView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if !model.claudeConnected {
+                Button(tr("Fix permanently…")) { showingSettings = true }
+                    .buttonStyle(.link)
+                    .font(.caption)
+            }
         } else if model.isRefreshing {
             HStack(spacing: 8) {
                 ProgressView()

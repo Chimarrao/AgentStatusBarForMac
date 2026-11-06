@@ -21,7 +21,7 @@ Providers you are not signed in to are hidden, in the menu bar and in the popove
 
 | Provider | Shows | Reads from |
 |----------|-------|-----------|
-| **Claude** | Session (5h), Weekly, usage credits spent | Claude Code sign-in (macOS Keychain item `Claude Code-credentials`, or `~/.claude/.credentials.json`) |
+| **Claude** | Session (5h), Weekly, usage credits spent | its **own sign-in** (Settings → Connect Claude, once); until you connect, Claude Code’s sign-in (macOS Keychain item `Claude Code-credentials`, or `~/.claude/.credentials.json`), read-only |
 | **Codex** | Session / Weekly / Monthly (whatever your plan has), credits, available limit resets | `~/.codex/auth.json` (or `$CODEX_HOME`) |
 | **Antigravity** | 5h + weekly for *Gemini* and *Claude & GPT* model groups; the menu bar follows the group you are using | the official `agy -p /usage` (Antigravity CLI), no credentials touched |
 | **Grok** | SuperGrok weekly pool, per-product split, prepaid balance | `~/.grok/auth.json` |
@@ -69,7 +69,8 @@ Compared with the original GrokBar:
 ## Privacy and caveats
 
 - Reads local sign-in files / Keychain items of the tools above, and talks only to those providers' usage endpoints (plus the public xAI status feed). It never sends chats, code or project files and makes no model requests.
-- It does **not** refresh Claude, Codex or Antigravity tokens (those tools rotate refresh tokens); if one expires, open that tool once.
+- It never refreshes or writes **Claude Code’s**, Codex’s or Antigravity’s tokens (those tools rotate refresh tokens, so doing it from here could sign you out); if one expires, open that tool once.
+- **Claude, permanently:** Claude Code’s access token lasts ~8 h and only Claude Code renews it, so a reader borrowing it goes stale a few times a day. In Settings → **Connect Claude** you authorize this app once in the browser and paste the code. It keeps its *own* session in `~/Library/Application Support/AgentStatusBar/claude-session.json` (mode 600, `user:profile` scope only), renews it by itself and never makes a model request, so it uses no tokens and never touches Claude Code’s login. Disconnect deletes the file. The flow uses Claude Code’s public OAuth client id.
 - **Claude:** uses Anthropic's undocumented `/api/oauth/usage` endpoint. That endpoint rate-limits unknown clients almost to zero, so the app sends `User-Agent: claude-code/<your installed version>`, like other community usage monitors. This may not be allowed by Anthropic's terms and can break at any time. Use at your own risk.
 - **Codex** uses an undocumented ChatGPT backend endpoint (`/backend-api/wham/usage`), also unofficial.
 - Claude's usage-credit *balance* is not exposed by the API, so only credits spent are shown.
