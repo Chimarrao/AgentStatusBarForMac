@@ -63,12 +63,9 @@ enum ClaudeError: LocalizedError {
     case badPayload
     case transport
     case rateLimited(until: Date)
-    case connectFailed
 
     var errorDescription: String? {
         switch self {
-        case .connectFailed:
-            return tr("Couldn’t connect to Claude. Try again.")
         case .rateLimited(let until):
             let f = DateFormatter()
             f.locale = L10n.language.locale
@@ -158,7 +155,7 @@ enum ClaudeAPI {
     }()
 
     /// Installed Claude Code version (this endpoint gives `claude-code/*` clients a far higher allowance).
-    static let cliVersion: String = {
+    private static let cliVersion: String = {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         for path in ["\(home)/.local/bin/claude", "/usr/local/bin/claude", "/opt/homebrew/bin/claude"]
         where FileManager.default.isExecutableFile(atPath: path) {
@@ -203,22 +200,11 @@ enum ClaudeAPI {
     }
 
     private static func fetchRemote() async throws -> ClaudeSnapshot {
-        // Prefer this app's own session (renews itself); otherwise borrow Claude Code's, read-only.
-        let accessToken: String
-        let plan: String
-        if let own = try await ClaudeOwnTokenProvider.shared.session() {
-            accessToken = own.accessToken
-            plan = own.planName ?? UserDefaults.standard.string(forKey: "claudePlanName") ?? "Claude"
-        } else {
-            let credential = try ClaudeAuthStore.load()
-            accessToken = credential.accessToken
-            plan = planName(credential.subscriptionType)
-            UserDefaults.standard.set(plan, forKey: "claudePlanName")
-        }
+        let credential = try ClaudeAuthStore.load()
 
         var request = URLRequest(url: endpoint)
         request.timeoutInterval = 20
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(credential.accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("claude-code/\(cliVersion)", forHTTPHeaderField: "User-Agent")
@@ -253,7 +239,7 @@ enum ClaudeAPI {
             weeklyResetsAt: weekly?.resetsAt,
             opusPercent: pool(root["seven_day_opus"])?.percent,
             sonnetPercent: pool(root["seven_day_sonnet"])?.percent,
-            planName: plan,
+            planName: planName(credential.subscriptionType),
             fetchedAt: Date(),
             creditRows: creditRows(root)
         )

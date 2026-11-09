@@ -40,7 +40,6 @@ SOURCES=(
   "$ROOT/Sources/CursorAuthStore.swift"
   "$ROOT/Sources/CursorAPI.swift"
   "$ROOT/Sources/ClaudeUsage.swift"
-  "$ROOT/Sources/ClaudeOAuth.swift"
   "$ROOT/Sources/CodexUsage.swift"
   "$ROOT/Sources/AntigravityUsage.swift"
   "$ROOT/Sources/ProviderIcons.swift"

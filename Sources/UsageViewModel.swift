@@ -68,53 +68,6 @@ final class UsageViewModel: ObservableObject {
         }
     }
 
-    // MARK: Claude connection (the app's own, self-renewing sign-in)
-
-    @Published private(set) var claudeConnected = ClaudeOwnAuth.load() != nil
-    @Published private(set) var claudeConnectPending: ClaudeOwnAuth.Pending?
-    @Published private(set) var claudeConnecting = false
-    @Published private(set) var claudeConnectError: String?
-    @Published var claudeConnectCode = ""
-
-    func beginClaudeConnect() {
-        let pending = ClaudeOwnAuth.begin()
-        claudeConnectPending = pending
-        claudeConnectCode = ""
-        claudeConnectError = nil
-        NSWorkspace.shared.open(pending.url)
-    }
-
-    func finishClaudeConnect() {
-        guard let pending = claudeConnectPending, !claudeConnecting else { return }
-        let code = claudeConnectCode
-        claudeConnecting = true
-        claudeConnectError = nil
-        Task { [weak self] in
-            do {
-                let session = try await ClaudeOwnAuth.complete(pasted: code, pending: pending)
-                ClaudeOwnAuth.save(session)
-                guard let self else { return }
-                self.claudeConnected = true
-                self.claudeConnectPending = nil
-                self.claudeConnectCode = ""
-                self.claudeConnecting = false
-                self.refresh(force: true)
-            } catch {
-                guard let self else { return }
-                self.claudeConnecting = false
-                self.claudeConnectError = tr("That code didn’t work. Click Connect Claude and try again.")
-            }
-        }
-    }
-
-    func disconnectClaude() {
-        ClaudeOwnAuth.clear()
-        claudeConnected = false
-        claudeConnectPending = nil
-        claudeConnectCode = ""
-        refresh(force: true)
-    }
-
     @Published var showAntigravityUsage: Bool {
         didSet {
             UserDefaults.standard.set(showAntigravityUsage, forKey: PrefKey.showAntigravity)
@@ -505,7 +458,6 @@ final class UsageViewModel: ObservableObject {
             cursorMessage = nil
         }
 
-        claudeConnected = ClaudeOwnAuth.load() != nil
         if showClaudeUsage {
             switch result.claude {
             case .success(let snap):
