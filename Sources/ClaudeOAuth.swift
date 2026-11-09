@@ -15,12 +15,6 @@ struct ClaudeOwnSession: Codable, Equatable, Sendable {
     var planName: String?
 }
 
-/// What the token endpoint answered when it said no (status plus its `error` text; never a secret).
-struct ClaudeTokenHTTPError: Error {
-    var status: Int
-    var detail: String
-}
-
 enum ClaudeOwnAuth {
     struct Pending: Sendable {
         let url: URL
@@ -88,27 +82,18 @@ enum ClaudeOwnAuth {
         let parts = pasted.trimmingCharacters(in: .whitespacesAndNewlines)
             .split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)
             .map(String.init)
-        guard let code = parts.first, !code.isEmpty else { throw ClaudeError.connectDetail("empty code") }
-        if parts.count > 1, !parts[1].isEmpty, parts[1] != pending.state {
-            throw ClaudeError.connectDetail("code is from an older browser tab; click Connect Claude once and use the newest")
-        }
+        guard let code = parts.first, !code.isEmpty else { throw ClaudeError.connectFailed }
+        if parts.count > 1, !parts[1].isEmpty, parts[1] != pending.state { throw ClaudeError.connectFailed }
 
-        let tokens: Tokens
-        do {
-            tokens = try await post([
+        let tokens = try await post([
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": redirectURI,
             "client_id": clientID,
             "code_verifier": pending.verifier,
             "state": pending.state,
-            ])
-        } catch let http as ClaudeTokenHTTPError {
-            throw ClaudeError.connectDetail("HTTP \(http.status)\(http.detail.isEmpty ? "" : ": \(http.detail)")")
-        } catch ClaudeError.transport {
-            throw ClaudeError.connectDetail("network error")
-        }
-        guard let refresh = tokens.refresh else { throw ClaudeError.connectDetail("no refresh token returned") }
+        ])
+        guard let refresh = tokens.refresh else { throw ClaudeError.connectFailed }
         var session = ClaudeOwnSession(
             accessToken: tokens.access,
             refreshToken: refresh,
@@ -121,18 +106,12 @@ enum ClaudeOwnAuth {
     /// Renews with this app's own refresh token. The new refresh token replaces the old one,
     /// so callers must persist the result before using it.
     static func refresh(_ session: ClaudeOwnSession) async throws -> ClaudeOwnSession {
-        let tokens: Tokens
-        do {
-            tokens = try await post([
-                "grant_type": "refresh_token",
-                "refresh_token": session.refreshToken,
-                "client_id": clientID,
-                "scope": scope,
-            ])
-        } catch let http as ClaudeTokenHTTPError {
-            // 400/401: the refresh token itself is no longer valid.
-            throw http.status == 400 || http.status == 401 ? ClaudeError.expired : ClaudeError.httpStatus(http.status)
-        }
+        let tokens = try await post([
+            "grant_type": "refresh_token",
+            "refresh_token": session.refreshToken,
+            "client_id": clientID,
+            "scope": scope,
+        ])
         var updated = session
         updated.accessToken = tokens.access
         if let refresh = tokens.refresh, !refresh.isEmpty { updated.refreshToken = refresh }
@@ -165,17 +144,9 @@ enum ClaudeOwnAuth {
             throw ClaudeError.transport
         }
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
-        guard (200...299).contains(status) else {
-            var detail = ""
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                let error = json["error"]
-                detail = (json["error_description"] as? String)
-                    ?? (error as? String)
-                    ?? ((error as? [String: Any])?["message"] as? String)
-                    ?? ""
-            }
-            throw ClaudeTokenHTTPError(status: status, detail: String(detail.prefix(120)))
-        }
+        // 400/401 from the token endpoint means the code or refresh token is no longer valid.
+        if status == 400 || status == 401 { throw ClaudeError.expired }
+        guard (200...299).contains(status) else { throw ClaudeError.httpStatus(status) }
         guard
             let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
             let access = json["access_token"] as? String, !access.isEmpty
