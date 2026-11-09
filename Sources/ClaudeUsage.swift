@@ -100,14 +100,96 @@ enum ClaudeAuthStore {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/.credentials.json")
     }
 
-    /// Read-only on purpose: the access token lives ~8 h and only Claude Code renews it (when it makes a
-    /// request). Renewing it here would spend Claude Code's single-use refresh token and risk signing you out.
-    static func load() throws -> Credential {
+    /// Never writes credentials. The access token lives ~8 h and only Claude Code renews it, so when it is
+    /// about to expire we ask Claude Code itself to (see `refreshViaCLI`) and read the result back.
+    /// Renewing it from here would spend Claude Code's single-use refresh token and could sign you out.
+    static func load(forceRefresh: Bool = false) async throws -> Credential {
+        var credential = try loadStored()
+        let expiring = (credential.expiresAt?.timeIntervalSinceNow ?? .infinity) < 300
+        if expiring || forceRefresh {
+            await refreshViaCLI()
+            credential = try loadStored()
+            if let expiresAt = credential.expiresAt, expiresAt <= Date() { throw ClaudeError.expired }
+        }
+        return credential
+    }
+
+    private static func loadStored() throws -> Credential {
         guard let data = keychainData() ?? (try? Data(contentsOf: credentialsFile)),
               let credential = parse(data)
         else { throw ClaudeError.notSignedIn }
-        if let expiresAt = credential.expiresAt, expiresAt <= Date() { throw ClaudeError.expired }
         return credential
+    }
+
+    // MARK: Renewal through Claude Code itself
+
+    private static let refreshLock = NSLock()
+    private nonisolated(unsafe) static var lastRefreshAttempt = Date.distantPast
+
+    private static var claudeExecutable: String? {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return ["\(home)/.local/bin/claude", "/usr/local/bin/claude", "/opt/homebrew/bin/claude"]
+            .first { FileManager.default.isExecutableFile(atPath: $0) }
+    }
+
+    private final class OutputBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var data = Data()
+        func append(_ chunk: Data) { lock.lock(); data.append(chunk); lock.unlock() }
+        func contains(_ needle: String) -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            return data.range(of: Data(needle.utf8)) != nil
+        }
+    }
+
+    private static func claimRefreshSlot() -> Bool {
+        refreshLock.lock()
+        defer { refreshLock.unlock() }
+        guard Date().timeIntervalSince(lastRefreshAttempt) > 90 else { return false }
+        lastRefreshAttempt = Date()
+        return true
+    }
+
+    /// Sends Claude Code a `get_usage` control request (the data behind `/usage`). To answer it the CLI
+    /// renews its own expired sign-in and rewrites its own Keychain item. It makes no model request, so it
+    /// costs no tokens. At most once every 90 s, and stopped after 25 s.
+    static func refreshViaCLI() async {
+        guard claimRefreshSlot(), let path = claudeExecutable else { return }
+        await Task.detached(priority: .utility) { runRefreshProcess(path) }.value
+    }
+
+    /// Synchronous on purpose (it blocks on the child process); always called off the main thread.
+    private static func runRefreshProcess(_ path: String) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = ["--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "-p"]
+        process.currentDirectoryURL = FileManager.default.temporaryDirectory
+        let input = Pipe()
+        let output = Pipe()
+        process.standardInput = input
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+
+        let box = OutputBox()
+        let answered = DispatchSemaphore(value: 0)
+        output.fileHandleForReading.readabilityHandler = { handle in
+            let chunk = handle.availableData
+            if chunk.isEmpty { answered.signal(); return }
+            box.append(chunk)
+            if box.contains("\"type\":\"control_response\"") { answered.signal() }
+        }
+        guard (try? process.run()) != nil else {
+            output.fileHandleForReading.readabilityHandler = nil
+            return
+        }
+        let request = #"{"type":"control_request","request_id":"1","request":{"subtype":"get_usage"}}"# + "\n"
+        input.fileHandleForWriting.write(Data(request.utf8))
+
+        _ = answered.wait(timeout: .now() + 25)
+        output.fileHandleForReading.readabilityHandler = nil
+        try? input.fileHandleForWriting.close()
+        Thread.sleep(forTimeInterval: 0.5) // let the CLI finish writing the renewed sign-in
+        if process.isRunning { process.terminate() }
     }
 
     private static func parse(_ data: Data) -> Credential? {
@@ -189,7 +271,13 @@ enum ClaudeAPI {
             throw ClaudeError.rateLimited(until: backoff)
         }
         do {
-            let snapshot = try await fetchRemote()
+            let snapshot: ClaudeSnapshot
+            do {
+                snapshot = try await fetchRemote()
+            } catch ClaudeError.unauthorized {
+                // Token revoked or rotated under us: have Claude Code renew it, then try once more.
+                snapshot = try await fetchRemote(forceRefresh: true)
+            }
             if let data = try? JSONEncoder().encode(snapshot) { defaults.set(data, forKey: cacheKey) }
             defaults.removeObject(forKey: backoffKey)
             return snapshot
@@ -199,8 +287,8 @@ enum ClaudeAPI {
         }
     }
 
-    private static func fetchRemote() async throws -> ClaudeSnapshot {
-        let credential = try ClaudeAuthStore.load()
+    private static func fetchRemote(forceRefresh: Bool = false) async throws -> ClaudeSnapshot {
+        let credential = try await ClaudeAuthStore.load(forceRefresh: forceRefresh)
 
         var request = URLRequest(url: endpoint)
         request.timeoutInterval = 20

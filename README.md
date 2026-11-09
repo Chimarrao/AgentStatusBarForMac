@@ -69,7 +69,9 @@ Compared with the original GrokBar:
 ## Privacy and caveats
 
 - Reads local sign-in files / Keychain items of the tools above, and talks only to those providers' usage endpoints (plus the public xAI status feed). It never sends chats, code or project files and makes no model requests.
-- It does **not** refresh Claude, Codex or Antigravity tokens (those tools rotate refresh tokens); if one expires, open that tool once.
+- It never writes or refreshes any tool's tokens itself (they rotate refresh tokens, so doing it from here could sign you out).
+- **Claude keeps itself fresh, without spending tokens:** Claude Code's access token lasts ~8 h and only Claude Code renews it. When the token is about to expire, the app sends the `claude` CLI a `get_usage` control request (the data behind `/usage`); to answer it, Claude Code renews its own sign-in and rewrites its own Keychain item. That is not a model request, so it costs no tokens, and it runs at most once every 90 s. Needs the `claude` CLI installed and signed in.
+- Codex and Antigravity: if their sign-in expires, open that tool once.
 - **Claude:** uses Anthropic's undocumented `/api/oauth/usage` endpoint. That endpoint rate-limits unknown clients almost to zero, so the app sends `User-Agent: claude-code/<your installed version>`, like other community usage monitors. This may not be allowed by Anthropic's terms and can break at any time. Use at your own risk.
 - **Codex** uses an undocumented ChatGPT backend endpoint (`/backend-api/wham/usage`), also unofficial.
 - Claude's usage-credit *balance* is not exposed by the API, so only credits spent are shown.
